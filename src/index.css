@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Tokens de tema (v4) */
+:root{
+  --color-bg:  #07071a;
+  --color-neon: #7c3aed;       /* morado neon */
+  --color-neon-2: #22d3ee;     /* cian neon */
+  --color-card: color-mix(in oklab, white 6%, transparent);
+  --shadow-neon: 0 0 20px color-mix(in oklab, var(--color-neon) 60%, transparent),
+                 0 0 40px color-mix(in oklab, var(--color-neon) 35%, transparent);
+}
+
+/* Utilidades pequeñas para brillo y glass */
+.glass {
+  background: var(--color-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in oklab, var(--color-neon) 30%, transparent);
+}
+
+.neon-border {
+  box-shadow: var(--shadow-neon);
+}
+
+/* Patrón sutil de puntos */
+.bg-dots {
+  background-image:
+    radial-gradient(circle at 1px 1px, color-mix(in oklab, white 6%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%);
+}
+
+/* Animación de resplandor para el botón */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 12px color-mix(in oklab, var(--color-neon-2) 45%, transparent); }
+  50% { box-shadow: 0 0 28px color-mix(in oklab, var(--color-neon) 55%, transparent); }
+}
+
+.btn-glow {
+  animation: glow 2.4s ease-in-out infinite;
+}
