@@ -1,5 +1,5 @@
 // ===============================================
-// ARCHIVO: src/pages/UsuariosPage.jsx (CORREGIDO)
+// ARCHIVO: src/pages/UsuariosPage.jsx (LIMPIO + CLUBES)
 // ===============================================
 
 import React, { useState, useEffect } from 'react';
@@ -22,71 +22,41 @@ export function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Nacionalidades
   const [nacionalidades, setNacionalidades] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [provincias, setProvincias] = useState([]);
+
   const [nacError, setNacError] = useState(null);
+  const [depError, setDepError] = useState(null);
+  const [provError, setProvError] = useState(null);
+
+  // 👉 NUEVO: estado para clubes
+  const [clubs, setClubs] = useState([]);
+  const [clubError, setClubError] = useState(null);
+  const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+  const [usuarioClub, setUsuarioClub] = useState(null);
 
   const API_URL = 'http://localhost:8080/api/usuario';
   const API_URLPersona = 'http://localhost:8080/api/persona';
   const API_URLNacionalidad = 'http://localhost:8080/api/nacionalidad/';
-
+  const API_URLDepartamento = 'http://localhost:8080/api/departamentos';
+  const API_URLProvincia = 'http://localhost:8080/api/provincias';
+  const API_URL_CLUB = 'http://localhost:8080/api/club'; // 👉 NUEVO, ajusta si es distinto
+  const API_URL_c = 'http://localhost:8080/api';
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
   };
 
-  // ===============================================
-  // VALIDACIÓN DE CONTRASEÑA SEGURA
-  // ===============================================
   const validarContraseñaSegura = (password) => {
     const errores = [];
-
-    if (password.length < 8) {
-      errores.push('Debe tener al menos 8 caracteres');
-    }
-
-    if (!/[A-Z]/.test(password)) {
-      errores.push('Debe contener al menos una letra mayúscula');
-    }
-
-    if (!/[a-z]/.test(password)) {
-      errores.push('Debe contener al menos una letra minúscula');
-    }
-
-    if (!/[0-9]/.test(password)) {
-      errores.push('Debe contener al menos un número');
-    }
-
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errores.push('Debe contener al menos un carácter especial (!@#$%^&*...)');
-    }
-
-    if (/012|123|234|345|456|567|678|789|890/.test(password)) {
-      errores.push('No debe contener números consecutivos (123, 456, etc.)');
-    }
-
-    if (/abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i.test(password)) {
-      errores.push('No debe contener letras consecutivas (abc, def, etc.)');
-    }
-
-    if (/(.)\1{2,}/.test(password)) {
-      errores.push('No debe contener más de 2 caracteres iguales seguidos (aaa, 111, etc.)');
-    }
-
-    const contraseñasComunes = [
-      'password', 'password1', '12345678', 'qwerty', 
-      'admin123', 'letmein', 'welcome', 'monkey123',
-      'abc123', '123456789', 'password123'
-    ];
+    if (password.length < 8) errores.push('Debe tener al menos 8 caracteres');
+    if (!/[A-Z]/.test(password)) errores.push('Debe contener mayúscula');
+    if (!/[a-z]/.test(password)) errores.push('Debe contener minúscula');
+    if (!/[0-9]/.test(password)) errores.push('Debe contener número');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errores.push('Debe contener carácter especial');
     
-    if (contraseñasComunes.some(común => password.toLowerCase().includes(común.toLowerCase()))) {
-      errores.push('No debe contener contraseñas comunes o predecibles');
-    }
-
-    return {
-      valida: errores.length === 0,
-      errores
-    };
+    return { valida: errores.length === 0, errores };
   };
 
   const pickArray = (data) => {
@@ -96,54 +66,136 @@ export function UsuariosPage() {
     return [];
   };
 
-  // ✅ NORMALIZAR GÉNERO - convierte cualquier formato a lowercase
-  const normalizarGenero = (genero) => {
-    if (!genero) return null;
-    const gen = String(genero).trim().toLowerCase();
-    // Validar que sea uno de los valores permitidos
-    if (['masculino', 'femenino', 'otro'].includes(gen)) {
-      return gen;
-    }
-    return null;
+  const pickArrayN = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.nacionalidades)) return data.nacionalidades;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
   };
 
-  // Normaliza usuario
+  const pickArrayD = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.departamentos)) return data.departamentos;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const pickArrayP = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.provincias)) return data.provincias;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  // 👉 NUEVO: helper para clubs
+  const pickArrayClubs = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.clubs)) return data.clubs;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const normalizarGenero = (genero) => {
+    if (!genero) return '';
+    const gen = String(genero).trim().toLowerCase();
+    return ['masculino', 'femenino', 'otro'].includes(gen) ? gen : '';
+  };
+
+  const formatDateForInput = (value) => {
+    console.log('🔍 formatDateForInput - valor recibido:', value, 'tipo:', typeof value);
+    
+    if (!value) return '';
+    
+    if (typeof value === 'string' && value.includes('T')) {
+      const resultado = value.split('T')[0];
+      console.log('✅ formatDateForInput - resultado:', resultado);
+      return resultado;
+    }
+    
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      console.log('✅ formatDateForInput - ya estaba correcto:', value);
+      return value;
+    }
+    
+    try {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        console.error('❌ formatDateForInput - fecha inválida');
+        return '';
+      }
+      
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const resultado = `${year}-${month}-${day}`;
+      
+      console.log('✅ formatDateForInput - convertido desde Date:', resultado);
+      return resultado;
+    } catch (e) {
+      console.error('❌ formatDateForInput - error:', e);
+      return '';
+    }
+  };
+
   const flattenUsuario = (u) => {
-    const p = u.persona ?? {};
-    const id_persona = u.persona_id ?? p.id;
-    const ci = p.ci;
-    const ap = p.ap;
-    const am = p.am;
+    const p = u.Persona ?? u.persona ?? {};
+    
+    const id_persona = u.persona_id ?? p.id_persona ?? p.id;
+    const ci = p.ci ?? '';
+    const ap = p.ap ?? '';
+    const am = p.am ?? '';
     const apellidos = [ap, am].filter(Boolean).join(' ').trim();
     const nombre = p.nombre ?? u.nombre ?? '';
     const nombreCompleto = [nombre, apellidos].filter(Boolean).join(' ').trim();
 
-    // Nacionalidad - asegurar que sea número
     const id_nacionalidad = p.id_nacionalidad ?? u.id_nacionalidad ?? null;
-    const pais = p.nacionalidad?.pais ?? u.nacionalidad?.pais ?? null;
+    const pais = p.nacionalidad?.pais ?? p.Nacionalidad?.pais ?? u.nacionalidad?.pais ?? null;
 
-    // ✅ GÉNERO - normalizado a lowercase
+    const id_departamento = p.id_departamento ?? null;
+    const nombreDepartamento = p.departamento?.nombre ?? p.Departamento?.nombre ?? null;
+
+    const id_provincia_origen = p.id_provincia_origen ?? null;
+    const nombreProvincia = p.provinciaOrigen?.nombre ?? p.ProvinciaOrigen?.nombre ?? p.Provincia?.nombre ?? null;
+
+    const fnac = formatDateForInput(p.fnac);
     const genero = normalizarGenero(p.genero ?? u.genero);
-
-    // ESTADO (activo/inactivo)
-    const estadoBooleano = u.estado ?? true; // Por defecto true
+    
+    const estadoBooleano = u.estado ?? true;
     const estadoVista = estadoBooleano ? 'activo' : 'inactivo';
+
+    // 👉 NUEVO: si backend ya manda club, mapeamos id_club
+    const id_club = u.id_club ?? u.club_id ?? null;
 
     return {
       ...u,
-      ci, id_persona, nombre, ap, am, apellidos, nombreCompleto,
-      id_nacionalidad, pais,
+      ci,
+      id_persona,
+      nombre,
+      ap,
+      am,
+      apellidos,
+      nombreCompleto,
+      id_nacionalidad,
+      pais,
+      id_departamento,
+      nombreDepartamento,
+      id_provincia_origen,
+      nombreProvincia,
+      fnac,
       genero,
-      estadoBooleano,      // ✅ Valor original booleano de la BD
-      estadoVista,   
-      persona: u.persona ?? null
+      estadoBooleano,
+      estadoVista,
+      id_club,
+      persona: p
     };
   };
 
-  // Montaje
   useEffect(() => {
     fetchUsuarios();
     fetchNacionalidades();
+    fetchDepartamentos();
+    fetchProvincias();
+    fetchClubs(); // 👉 NUEVO
   }, []);
 
   const fetchUsuarios = async () => {
@@ -153,7 +205,6 @@ export function UsuariosPage() {
       const response = await fetch(API_URL, { method: 'GET', headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Error al cargar los usuarios');
       const data = await response.json();
-      console.log('Usuarios cargados:', data); // Debug
       const arr = pickArray(data);
       setUsuarios(arr.map(flattenUsuario));
     } catch (err) {
@@ -165,146 +216,198 @@ export function UsuariosPage() {
     }
   };
 
-  // Helper nacionalidades
-  const pickArrayN = (data) => {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.nacionalidades)) return data.nacionalidades;
-    if (Array.isArray(data?.data)) return data.data;
-    return [];
+  const fetchNacionalidades = async () => {
+    setNacError(null);
+    try {
+      const res = await fetch(API_URLNacionalidad, {
+        method: 'GET',
+        headers: { ...getAuthHeaders(), Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error');
+      const data = await res.json();
+      const arr = pickArrayN(data);
+      const opts = arr.map((n) => ({
+        label: n.pais ?? `#${n.id_nacionalidad}`,
+        value: String(n.id_nacionalidad),
+      }));
+      setNacionalidades(opts);
+    } catch (e) {
+      console.error('❌ Error fetchNacionalidades:', e);
+      setNacError(e.message);
+      setNacionalidades([]);
+    }
   };
 
-const fetchNacionalidades = async () => {
-  setNacError(null);
-  try {
-    const res = await fetch(API_URLNacionalidad, {
-      method: 'GET',
-      headers: { ...getAuthHeaders(), Accept: 'application/json' }
-    });
-    if (!res.ok) throw new Error('Error al cargar nacionalidades');
-    const data = await res.json();
-    const arr = pickArrayN(data);
-    
-    // ✅ Asegurar que los valores sean strings
-    const opts = arr.map((n) => ({
-      label: n.pais ?? `#${n.id_nacionalidad}`,
-      value: String(n.id_nacionalidad), // Siempre como string
-      raw: n,
-    }));
-    
-    console.log('✅ Nacionalidades cargadas:', opts);
-    setNacionalidades(opts);
-  } catch (e) {
-    console.error(e);
-    setNacError(e.message || 'No se pudo cargar nacionalidades');
-    setNacionalidades([]);
-  }
-};
+  const fetchDepartamentos = async () => {
+    setDepError(null);
+    try {
+      const res = await fetch(API_URLDepartamento, {
+        method: 'GET',
+        headers: { ...getAuthHeaders(), Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error');
+      const data = await res.json();
+      const arr = pickArrayD(data);
+      const opts = arr.map((d) => ({
+        label: d.nombre ?? `#${d.id_departamento}`,
+        value: String(d.id_departamento),
+        id_nacionalidad: d.id_nacionalidad,
+      }));
+      setDepartamentos(opts);
+    } catch (e) {
+      console.error('❌ Error fetchDepartamentos:', e);
+      setDepError(e.message);
+      setDepartamentos([]);
+    }
+  };
 
-  const filteredUsuarios = Array.isArray(usuarios)
-    ? usuarios.filter(u => {
-        const term = searchTerm.toLowerCase();
-        return (u.nombreCompleto ?? '').toLowerCase().includes(term)
-            || (u.email ?? '').toLowerCase().includes(term);
-      })
-    : [];
+  const fetchProvincias = async () => {
+    setProvError(null);
+    try {
+      const res = await fetch(API_URLProvincia, {
+        method: 'GET',
+        headers: { ...getAuthHeaders(), Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error');
+      const data = await res.json();
+      const arr = pickArrayP(data);
+      const opts = arr.map((p) => ({
+        label: p.nombre,
+        value: String(p.id_provincia),
+        id_departamento: p.id_departamento,
+      }));
+      setProvincias(opts);
+    } catch (e) {
+      console.error('❌ Error fetchProvincias:', e);
+      setProvError(e.message);
+      setProvincias([]);
+    }
+  };
 
-  // Abrir modales
-  const openCreateModal = () => { setIsCreateModalOpen(true); };
+  // 👉 NUEVO: fetch de clubes
+  const fetchClubs = async () => {
+    setClubError(null);
+    try {
+      const res = await fetch(API_URL_CLUB, {
+        method: 'GET',
+        headers: { ...getAuthHeaders(), Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error al cargar clubes');
+      const data = await res.json();
+      const arr = pickArrayClubs(data);
+      const opts = arr.map((c) => ({
+        label: c.nombre ?? `Club #${c.id_club ?? c.id}`,
+        value: String(c.id_club ?? c.id),
+      }));
+      setClubs(opts);
+    } catch (e) {
+      console.error('❌ Error fetchClubs:', e);
+      setClubError(e.message);
+      setClubs([]);
+    }
+  };
+
+  const openCreateModal = () => { 
+    setIsCreateModalOpen(true);
+  };
   
-  // ✅ MEJORADO: Abrir modal de edición con logs
-  const openPersonaEdit = (usuario) => { 
-    console.log('Editando usuario:', usuario); // Debug
-    console.log('ID Nacionalidad:', usuario.id_nacionalidad); // Debug
-    console.log('Género:', usuario.genero); // Debug
-    setEditingUsuario(usuario); 
-    setIsPersonaModalOpen(true); 
+  // openPersonaEdit con fetch individual
+  const openPersonaEdit = async (usuario) => { 
+    try {
+      setLoading(true);
+      
+      console.log('═══════════════════════════════════════════════════');
+      console.log('🔍 FETCH INDIVIDUAL - Obteniendo usuario del backend...');
+      console.log('═══════════════════════════════════════════════════');
+      
+      const res = await fetch(`${API_URL}/${usuario.id}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      if (!res.ok) {
+        throw new Error(`Error HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const response = await res.json();
+      
+      console.log('📥 RESPUESTA DEL BACKEND:');
+      console.log(JSON.stringify(response, null, 2));
+      console.log('═══════════════════════════════════════════════════');
+      
+      const usuarioCompleto = response.data || response;
+      const usuarioProcesado = flattenUsuario(usuarioCompleto);
+      
+      console.log('✅ USUARIO PROCESADO (para initialData):');
+      console.log(JSON.stringify(usuarioProcesado, null, 2));
+      console.log('═══════════════════════════════════════════════════');
+      
+      setEditingUsuario(usuarioProcesado); 
+      setIsPersonaModalOpen(true);
+    } catch (err) {
+      console.error('❌ Error al cargar usuario:', err);
+      alert(err.message || 'Error al cargar los datos del usuario');
+    } finally {
+      setLoading(false);
+    }
   };
   
   const openEmailEdit = (usuario) => { setEditingUsuario(usuario); setIsEmailModalOpen(true); };
   const openRoleEdit = (usuario) => { setEditingUsuario(usuario); setIsRoleModalOpen(true); };
   const openPasswordEdit = (usuario) => { setEditingUsuario(usuario); setIsPasswordModalOpen(true); };
 
- // ===============================================
-// CAMBIAR ESTADO (ACTIVAR/DESACTIVAR) - CORREGIDO
-// ===============================================
-const toggleEstado = async (usuario) => {
-  // ✅ Usar estadoVista (que es el string 'activo'/'inactivo')
-  const nuevoEstado = usuario.estadoVista === 'activo' ? 'inactivo' : 'activo';
-  
-  const mensaje = nuevoEstado === 'activo' 
-    ? '¿Estás seguro que deseas activar este usuario?' 
-    : '¿Estás seguro que deseas desactivar este usuario?';
-  
-  if (!window.confirm(mensaje)) return;
-  
-  // ✅ Debug para verificar qué se está enviando
-  console.log('🔍 Datos del usuario:', {
-    id: usuario.id,
-    estadoOriginal: usuario.estado,
-    estadoBooleano: usuario.estadoBooleano,
-    estadoVista: usuario.estadoVista,
-    nuevoEstado: nuevoEstado
-  });
-  
-  try {
-    const res = await fetch(`${API_URL}/${usuario.id}/estado`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ estado: nuevoEstado }) // ✅ Envía 'activo' o 'inactivo'
-    });
+  // 👉 NUEVO: abrir modal de club
+  const openClubModal = (usuario) => {
+    setUsuarioClub(usuario);
+    setIsClubModalOpen(true);
+  };
 
-    // ✅ Debug de la respuesta
-    const responseText = await res.text();
-    console.log('📥 Respuesta del servidor:', responseText);
+  const toggleEstado = async (usuario) => {
+    const nuevoEstado = usuario.estadoVista === 'activo' ? 'inactivo' : 'activo';
+    const mensaje = nuevoEstado === 'activo' 
+      ? '¿Estás seguro que deseas activar este usuario?' 
+      : '¿Estás seguro que deseas desactivar este usuario?';
+    
+    if (!window.confirm(mensaje)) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/${usuario.id}/estado`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ estado: nuevoEstado })
+      });
 
-    if (!res.ok) {
-      let errorData;
-      try {
-        errorData = JSON.parse(responseText);
-      } catch {
-        errorData = { message: responseText };
-      }
-      throw new Error(errorData.message || 'Error al cambiar el estado del usuario');
+      if (!res.ok) throw new Error('Error al cambiar estado');
+
+      const nuevoBooleano = nuevoEstado === 'activo';
+      setUsuarios(prev => prev.map(u => 
+        u.id === usuario.id 
+          ? { 
+              ...u, 
+              estado: nuevoBooleano,
+              estadoBooleano: nuevoBooleano,
+              estadoVista: nuevoEstado
+            } 
+          : u
+      ));
+
+      alert(`Usuario ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} correctamente`);
+    } catch (err) {
+      alert('Error: ' + err.message);
     }
+  };
 
-    // ✅ Calcular el nuevo booleano
-    const nuevoBooleano = nuevoEstado === 'activo';
-
-    // ✅ Actualizar localmente con todos los valores
-    setUsuarios(prev => prev.map(u => 
-      u.id === usuario.id 
-        ? { 
-            ...u, 
-            estado: nuevoBooleano,              // Booleano para la BD
-            estadoBooleano: nuevoBooleano,      // Booleano explícito
-            estadoVista: nuevoEstado            // String para la vista
-          } 
-        : u
-    ));
-
-    alert(`Usuario ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} correctamente`);
-  } catch (err) {
-    console.error('❌ Error:', err);
-    alert('Error al cambiar el estado: ' + err.message);
-  }
-};
-
-  // Eliminar
   const handleDelete = async (id) => {
     if (!window.confirm('¿Estás seguro que deseas eliminar este usuario?')) return;
     try {
       const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-      if (!response.ok) throw new Error('Error al eliminar el usuario');
+      if (!response.ok) throw new Error('Error al eliminar');
       setUsuarios(prev => prev.filter(u => u.id !== id));
     } catch (err) {
-      console.error(err);
-      alert('Error al eliminar el usuario: ' + err.message);
+      alert('Error: ' + err.message);
     }
   };
 
-  // ===============================================
-  // CREAR USUARIO COMPLETO (CON VALIDACIÓN)
-  // ===============================================
   const handleCreateUsuario = async (formData) => {
     try {
       if (!formData.email || !formData.email.includes('@')) {
@@ -313,8 +416,7 @@ const toggleEstado = async (usuario) => {
 
       const validacionPassword = validarContraseñaSegura(formData.password);
       if (!validacionPassword.valida) {
-        const mensajesError = validacionPassword.errores.join('\n• ');
-        throw new Error(`La contraseña no cumple con los requisitos de seguridad:\n\n• ${mensajesError}`);
+        throw new Error(`Contraseña: ${validacionPassword.errores.join(', ')}`);
       }
 
       if (formData.password !== formData.confirmPassword) {
@@ -322,19 +424,23 @@ const toggleEstado = async (usuario) => {
       }
 
       const bodyData = {
-        ci: formData.ci,
-        nombre: formData.nombre,
-        ap: formData.ap,
-        am: formData.am,
-        fnac: formData.fnac,
-        id_nacionalidad: formData.id_nacionalidad ? Number(formData.id_nacionalidad) : undefined,
-        genero: formData.genero || undefined,
-        email: formData.email,
-        password: formData.password,
-        rol: formData.rol || 'secretario'
+        persona: {
+          ci: formData.ci,
+          nombre: formData.nombre,
+          ap: formData.ap,
+          am: formData.am,
+          fnac: formData.fnac || undefined,
+          id_nacionalidad: formData.id_nacionalidad ? Number(formData.id_nacionalidad) : undefined,
+          id_departamento: formData.id_departamento ? Number(formData.id_departamento) : undefined,
+          id_provincia_origen: formData.id_provincia_origen ? Number(formData.id_provincia_origen) : undefined,
+          genero: formData.genero || undefined,
+        },
+        usuario: {
+          email: formData.email,
+          password: formData.password,
+          rol: formData.rol || 'secretario',
+        }
       };
-
-      console.log('Creando usuario:', bodyData); // Debug
 
       const res = await fetch(`${API_URL}`, {
         method: 'POST',
@@ -355,12 +461,10 @@ const toggleEstado = async (usuario) => {
       await fetchUsuarios();
       alert('Usuario creado exitosamente');
     } catch (err) {
-      console.error(err);
       alert(err.message);
     }
   };
 
-  // Guardar PERSONA
   const handlePersonaSubmit = async (formData) => {
     try {
       if (!editingUsuario?.id_persona) {
@@ -372,11 +476,12 @@ const toggleEstado = async (usuario) => {
         nombre: formData.nombre,
         ap: formData.ap,
         am: formData.am,
+        fnac: formData.fnac || undefined,
         id_nacionalidad: formData.id_nacionalidad ? Number(formData.id_nacionalidad) : undefined,
+        id_departamento: formData.id_departamento ? Number(formData.id_departamento) : undefined,
+        id_provincia_origen: formData.id_provincia_origen ? Number(formData.id_provincia_origen) : undefined,
         genero: formData.genero || undefined
       };
-
-      console.log('Actualizando persona:', bodyPersona); // Debug
 
       const res = await fetch(`${API_URLPersona}/${editingUsuario.id_persona}`, {
         method: 'PUT',
@@ -384,19 +489,17 @@ const toggleEstado = async (usuario) => {
         body: JSON.stringify(bodyPersona)
       });
 
-      if (!res.ok) throw new Error('Error al actualizar datos de persona');
+      if (!res.ok) throw new Error('Error al actualizar');
 
       setIsPersonaModalOpen(false);
       setEditingUsuario(null);
-      await fetchUsuarios(); // Recargar para obtener datos actualizados
+      await fetchUsuarios();
       alert('Datos personales actualizados correctamente');
     } catch (err) {
-      console.error(err);
       alert(err.message);
     }
   };
 
-  // Guardar EMAIL
   const handleEmailSubmit = async (formData) => {
     try {
       if (!editingUsuario?.id) throw new Error('Usuario no válido');
@@ -419,12 +522,10 @@ const toggleEstado = async (usuario) => {
       setEditingUsuario(null);
       alert('Email actualizado correctamente');
     } catch (err) {
-      console.error(err);
       alert(err.message);
     }
   };
 
-  // Guardar ROL
   const handleRoleSubmit = async (formData) => {
     try {
       if (!editingUsuario?.id) throw new Error('Usuario no válido');
@@ -435,7 +536,7 @@ const toggleEstado = async (usuario) => {
         body: JSON.stringify({ rol: formData.rol })
       });
 
-      if (!res.ok) throw new Error('Error al actualizar rol');
+      if (!res.ok) throw new Error('Error al actualizar');
 
       const result = await res.json();
       const updated = flattenUsuario(result.usuario || result.data || result);
@@ -444,22 +545,17 @@ const toggleEstado = async (usuario) => {
       setEditingUsuario(null);
       alert('Rol actualizado correctamente');
     } catch (err) {
-      console.error(err);
       alert(err.message);
     }
   };
 
-  // ===============================================
-  // GUARDAR PASSWORD (CON VALIDACIÓN)
-  // ===============================================
   const handlePasswordSubmit = async (formData) => {
     try {
       if (!editingUsuario?.id) throw new Error('Usuario no válido');
       
       const validacionPassword = validarContraseñaSegura(formData.password);
       if (!validacionPassword.valida) {
-        const mensajesError = validacionPassword.errores.join('\n• ');
-        throw new Error(`La contraseña no cumple con los requisitos de seguridad:\n\n• ${mensajesError}`);
+        throw new Error(`Contraseña: ${validacionPassword.errores.join(', ')}`);
       }
 
       if (formData.password !== formData.confirmPassword) {
@@ -472,18 +568,53 @@ const toggleEstado = async (usuario) => {
         body: JSON.stringify({ password: formData.password })
       });
 
-      if (!res.ok) throw new Error('Error al actualizar la contraseña');
+      if (!res.ok) throw new Error('Error al actualizar');
 
       setIsPasswordModalOpen(false);
       setEditingUsuario(null);
       alert('Contraseña actualizada correctamente');
     } catch (err) {
-      console.error(err);
       alert(err.message);
     }
   };
 
-  // Botón de acción con icono
+  // 👉 NUEVO: submit asignar club
+const handleClubSubmit = async (formData) => {
+  try {
+    // ✅ Cambiar editingUsuario por usuarioClub
+    if (!usuarioClub?.id) throw new Error('Usuario no válido');
+      const rolMap = {
+      presidenteclub: 'presidente',
+      representante: 'representante'
+    }; 
+    const rol=rolMap[usuarioClub.rol];
+    const body = {
+      id_usuario: Number(usuarioClub.id),
+      id_club: formData.id_club ? Number(formData.id_club) : null,
+      rol_en_club: rol || 'representante',
+      fecha_inicio: new Date()
+    };
+
+    const res = await fetch(`${API_URL_c}/clubusuario`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) throw new Error('Error al asignar club');
+
+    setIsClubModalOpen(false);
+    setUsuarioClub(null);
+    await fetchUsuarios();
+    alert('Club asignado correctamente');
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
   const IconBtn = ({ title, onClick, children, danger }) => (
     <button
       title={title}
@@ -497,28 +628,20 @@ const toggleEstado = async (usuario) => {
     </button>
   );
 
-  // ===============================================
-  // COLUMNAS CON ESTADO ACTIVO/INACTIVO
-  // ===============================================
   const columns = [
     { 
       key: 'ci', 
       label: 'CI', 
-      render: (value, row) => <div className="font-medium text-gray-900">{value || row.ci || 'N/A'}</div> 
+      render: (value) => <div className="font-medium text-gray-900">{value || 'N/A'}</div> 
     },
     { 
       key: 'nombre', 
       label: 'Nombre', 
-      render: (value, row) => <div className="font-medium text-gray-900">{value || row.nombre || 'N/A'}</div> 
+      render: (value) => <div className="font-medium text-gray-900">{value || 'N/A'}</div> 
     },
     { 
       key: 'ap', 
       label: 'Apellido Paterno', 
-      render: (value) => <div className="font-medium text-gray-900">{value || 'N/A'}</div> 
-    },
-    { 
-      key: 'am', 
-      label: 'Apellido Materno', 
       render: (value) => <div className="font-medium text-gray-900">{value || 'N/A'}</div> 
     },
     { 
@@ -536,151 +659,260 @@ const toggleEstado = async (usuario) => {
       )
     },
     {
-      key: 'genero',
-      label: 'Género',
-      render: (value) => <div className="text-gray-600 capitalize">{value || '—'}</div>
+      key: 'nombreDepartamento',
+      label: 'Departamento',
+      render: (value) => <div className="text-gray-600">{value || '—'}</div>
     },
     {
-key: 'estadoVista', // ✅ Usar estadoVista
-  label: 'Estado',
-  render: (value, row) => {
-    // ✅ Verificar el booleano
-    const esActivo = row.estadoBooleano === true || row.estado === true;
-    return (
-      <div className="flex items-center gap-2">
-        <div className={`w-3 h-3 rounded-full ${esActivo ? 'bg-green-500' : 'bg-red-500'}`}></div>
-        <span className={`text-sm font-medium ${esActivo ? 'text-green-700' : 'text-red-700'}`}>
-          {esActivo ? 'Activo' : 'Inactivo'}
-        </span>
-      </div>
-    );
-  }
+      key: 'nombreProvincia',
+      label: 'Provincia',
+      render: (value) => <div className="text-gray-600">{value || '—'}</div>
+    },
+    {
+      key: 'estadoVista',
+      label: 'Estado',
+      render: (value, row) => {
+        const esActivo = row.estadoBooleano === true || row.estado === true;
+        return (
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${esActivo ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className={`text-sm font-medium ${esActivo ? 'text-green-700' : 'text-red-700'}`}>
+              {esActivo ? 'Activo' : 'Inactivo'}
+            </span>
+          </div>
+        );
+      }
     },
     {
       key: 'acciones',
       label: 'Acciones',
-      render: (_v, row) => (
-        <div className="flex items-center gap-2">
-          <IconBtn title="Editar Persona" onClick={() => openPersonaEdit(row)}>
-            <Pencil size={18} />
-          </IconBtn>
-          {/*<IconBtn title="Cambiar Email" onClick={() => openEmailEdit(row)}>
-            <Mail size={18} />
-          </IconBtn>*/}
-          <IconBtn title="Cambiar Rol" onClick={() => openRoleEdit(row)}>
-            <Shield size={18} />
-          </IconBtn>
-          <IconBtn title="Cambiar Contraseña" onClick={() => openPasswordEdit(row)}>
-            <KeyRound size={18} />
-          </IconBtn>
-          <IconBtn 
-            title={row.estadoVista === 'activo' ? 'Desactivar Usuario' : 'Activar Usuario'} // ✅ Usar estadoVista
-            onClick={() => toggleEstado(row)}
-          >
-            <Power size={18} className={row.estadoVista === 'activo' ? 'text-green-600' : 'text-gray-400'} /> {/* ✅ Usar estadoVista */}
-          </IconBtn>
-          {/*<IconBtn title="Eliminar Usuario" onClick={() => handleDelete(row.id)} danger>
-            <Trash2 size={18} />
-          </IconBtn>*/}
-        </div>
-      )
+      render: (_v, row) => {
+        const puedeAsignarClub =
+          row.rol === 'representante' || row.rol === 'presidenteclub';
+        return (
+          <div className="flex items-center gap-2">
+            <IconBtn title="Editar Persona" onClick={() => openPersonaEdit(row)}>
+              <Pencil size={18} />
+            </IconBtn>
+            <IconBtn title="Cambiar Rol" onClick={() => openRoleEdit(row)}>
+              <Shield size={18} />
+            </IconBtn>
+            <IconBtn title="Cambiar Contraseña" onClick={() => openPasswordEdit(row)}>
+              <KeyRound size={18} />
+            </IconBtn>
+
+            {puedeAsignarClub && (
+              <IconBtn title="Asignar Club" onClick={() => openClubModal(row)}>
+                <Users size={18} />
+              </IconBtn>
+            )}
+
+            <IconBtn 
+              title={row.estadoVista === 'activo' ? 'Desactivar Usuario' : 'Activar Usuario'}
+              onClick={() => toggleEstado(row)}
+            >
+              <Power size={18} className={row.estadoVista === 'activo' ? 'text-green-600' : 'text-gray-400'} />
+            </IconBtn>
+          </div>
+        );
+      }
     }
   ];
 
-  // ===== Campos formularios =====
-  // Crear usuario (Persona + Usuario)
-  const createUsuarioFields = [
-    { name: 'ci', label: 'CI', type: 'text', placeholder: 'Ej: 12345678', required: true },
-    { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true },
-    { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true },
-    { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false },
-    { name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false },
-    {
-      name: 'id_nacionalidad',
-      label: 'Nacionalidad',
-      type: 'select',
-      required: false,
-      placeholder: 'Seleccione una nacionalidad',
-      options: nacionalidades,
-    },
-    {
-      name: 'genero',
-      label: 'Género',
-      type: 'select',
-      required: false,
-      placeholder: 'Seleccione un género',
-      options: [
-        { label: 'Masculino', value: 'masculino' },
-        { label: 'Femenino', value: 'femenino' },
-        { label: 'Otro', value: 'otro' },
-      ],
-    },
-    { name: 'email', label: 'Email (Usuario)', type: 'email', placeholder: 'usuario@ejemplo.com', required: true },
-    {
-      name: 'rol',
-      label: 'Rol',
-      type: 'select',
-      required: true,
-      options: [
-        { label: 'Secretario', value: 'secretario' },
-        { label: 'Administrador', value: 'admin' },
-        { label: 'Presidente', value: 'presidente' },
-        { label: 'Presidente de Club', value: 'presidenteclub' },
-        { label: 'Representante', value: 'representante' },
-        { label: 'Planillero', value: 'juez' }
-      ]
-    },
-    { 
-      name: 'password', 
-      label: 'Contraseña', 
-      type: 'password', 
-      placeholder: 'Mínimo 8 caracteres', 
-      required: true,
-      helpText: 'Debe contener mayúsculas, minúsculas, números y caracteres especiales'
-    },
-    { 
-      name: 'confirmPassword', 
-      label: 'Confirmar Contraseña', 
-      type: 'password', 
-      placeholder: 'Repite la contraseña', 
-      required: true 
-    },
-  ];
+  const getCreateUsuarioFields = () => {
+    return [
+      { name: 'ci', label: 'CI', type: 'text', placeholder: 'Ej: 12345678', required: true, cols: 3 },
+      { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true, cols: 3 },
+      { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true, cols: 3 },
+      { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false, cols: 3 },
+      { name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false, cols: 2 },
+      {
+        name: 'genero',
+        label: 'Género',
+        type: 'select',
+        required: false,
+        placeholder: 'Seleccione un género',
+        cols: 2,
+        options: [
+          { label: 'Masculino', value: 'masculino' },
+          { label: 'Femenino', value: 'femenino' },
+          { label: 'Otro', value: 'otro' },
+        ],
+      },
+      {
+        name: 'id_nacionalidad',
+        label: 'Nacionalidad',
+        type: 'select',
+        required: false,
+        placeholder: 'Seleccione una nacionalidad',
+        resetChildren: ['id_departamento', 'id_provincia_origen'],
+        cols: 2,
+        options: nacionalidades,
+      },
+      {
+        name: "id_departamento",
+        label: "Departamento",
+        type: "select",
+        placeholder: 'Seleccione un departamento',
+        resetChildren: ['id_provincia_origen'],
+        cols: 2,
+        getDynamicOptions: (formData) => {
+          const nacionalidadId = formData.id_nacionalidad;
+          if (!nacionalidadId) return departamentos;
+          return departamentos.filter(
+            d => String(d.id_nacionalidad) === String(nacionalidadId)
+          );
+        },
+        options: departamentos,
+      },
+      {
+        name: "id_provincia_origen",
+        label: "Provincia",
+        type: "select",
+        placeholder: 'Seleccione una provincia',
+        cols: 2,
+        getDynamicOptions: (formData) => {
+          const departamentoId = formData.id_departamento;
+          if (!departamentoId) return provincias;
+          return provincias.filter(
+            p => String(p.id_departamento) === String(departamentoId)
+          );
+        },
+        options: provincias,
+      },
+      { name: 'email', label: 'Email (Usuario)', type: 'email', placeholder: 'usuario@ejemplo.com', required: true, cols: 2 },
+      {
+        name: 'rol',
+        label: 'Rol',
+        type: 'select',
+        required: true,
+        cols: 2,
+        options: [
+          { label: 'Secretario', value: 'secretario' },
+          { label: 'Administrador', value: 'admin' },
+          { label: 'Presidente', value: 'presidente' },
+          { label: 'Presidente de Club', value: 'presidenteclub' },
+          { label: 'Representante', value: 'representante' },
+          { label: 'Planillero', value: 'juez' }
+        ]
+      },
+      { 
+        name: 'password', 
+        label: 'Contraseña', 
+        type: 'password', 
+        placeholder: 'Mínimo 8 caracteres', 
+        required: true,
+        cols: 2,
+      },
+      { 
+        name: 'confirmPassword', 
+        label: 'Confirmar Contraseña', 
+        type: 'password', 
+        placeholder: 'Repite la contraseña', 
+        required: true,
+        cols: 2,
+      },
+    ];
+  };
 
-  // Editar persona
-  const personaFields = [
-    { name: 'ci', label: 'CI', type: 'text', placeholder: 'XXXXXXX', required: true },
-    { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true },
-    { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true },
-    { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false },
-    {
-      name: 'id_nacionalidad',
-      label: 'Nacionalidad',
-      type: 'select',
-      required: false,
-      placeholder: 'Seleccione una nacionalidad',
-      options: nacionalidades,
-    },
-    {
-      name: 'genero',
-      label: 'Género',
-      type: 'select',
-      required: false,
-      placeholder: 'Seleccione un género',
-      options: [
-        { label: 'Masculino', value: 'masculino' },
-        { label: 'Femenino', value: 'femenino' },
-        { label: 'Otro', value: 'otro' },
-      ],
-    },
-  ];
+  const getPersonaFields = () => {
+    return [
+      { name: 'ci', label: 'CI', type: 'text', placeholder: 'XXXXXXX', required: true, cols: 1 },
+      { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true, cols: 1 },
+      { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true, cols: 1 },
+      { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false, cols: 1 },
+      { name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false, cols: 1 },
+      {
+        name: 'genero',
+        label: 'Género',
+        type: 'select',
+        required: false,
+        placeholder: 'Seleccione un género',
+        cols: 1,
+        options: [
+          { label: 'Masculino', value: 'masculino' },
+          { label: 'Femenino', value: 'femenino' },
+          { label: 'Otro', value: 'otro' },
+        ],
+      },
+      {
+        name: 'id_nacionalidad',
+        label: 'Nacionalidad',
+        type: 'select',
+        required: false,
+        placeholder: 'Seleccione una nacionalidad',
+        resetChildren: ['id_departamento', 'id_provincia_origen'],
+        cols: 1,
+        options: nacionalidades,
+      },
+      {
+        name: "id_departamento",
+        label: "Departamento",
+        type: "select",
+        placeholder: 'Seleccione un departamento',
+        resetChildren: ['id_provincia_origen'],
+        cols: 1,
+        getDynamicOptions: (formData) => {
+          const nacionalidadId = formData.id_nacionalidad;
+          if (!nacionalidadId) return departamentos;
+          return departamentos.filter(
+            d => String(d.id_nacionalidad) === String(nacionalidadId)
+          );
+        },
+        options: departamentos,
+      },
+      {
+        name: "id_provincia_origen",
+        label: "Provincia",
+        type: "select",
+        placeholder: 'Seleccione una provincia',
+        cols: 1,
+        getDynamicOptions: (formData) => {
+          const departamentoId = formData.id_departamento;
+          if (!departamentoId) return provincias;
+          return provincias.filter(
+            p => String(p.id_departamento) === String(departamentoId)
+          );
+        },
+        options: provincias,
+      },
+    ];
+  };
 
-  // Cambiar email
+  const getInitialDataForEdit = (usuario) => {
+    if (!usuario) return {};
+    
+    const p = usuario.persona ?? usuario.Persona ?? {};
+    const fnacValue = usuario.fnac ?? p.fnac ?? '';
+
+    const data = {
+      ci: usuario.ci ?? p.ci ?? '',
+      nombre: usuario.nombre ?? p.nombre ?? '',
+      ap: usuario.ap ?? p.ap ?? '',
+      am: usuario.am ?? p.am ?? '',
+      fnac: formatDateForInput(fnacValue),
+      id_nacionalidad:
+        usuario.id_nacionalidad != null
+          ? String(usuario.id_nacionalidad)
+          : (p.id_nacionalidad != null ? String(p.id_nacionalidad) : ''),
+      id_departamento:
+        usuario.id_departamento != null
+          ? String(usuario.id_departamento)
+          : (p.id_departamento != null ? String(p.id_departamento) : ''),
+      id_provincia_origen:
+        usuario.id_provincia_origen != null
+          ? String(usuario.id_provincia_origen)
+          : (p.id_provincia_origen != null ? String(p.id_provincia_origen) : ''),
+      genero: normalizarGenero(usuario.genero ?? p.genero),
+    };
+
+    return data;
+  };
+
   const emailFields = [
     { name: 'email', label: 'Nuevo Email', type: 'email', placeholder: 'usuario@ejemplo.com', required: true },
   ];
 
-  // Cambiar rol
   const roleFields = [
     {
       name: 'rol',
@@ -698,7 +930,6 @@ key: 'estadoVista', // ✅ Usar estadoVista
     },
   ];
 
-  // Cambiar password
   const passwordFields = [
     { 
       name: 'password', 
@@ -706,7 +937,6 @@ key: 'estadoVista', // ✅ Usar estadoVista
       type: 'password', 
       placeholder: 'Mínimo 8 caracteres', 
       required: true,
-      helpText: 'Debe contener mayúsculas, minúsculas, números y caracteres especiales'
     },
     { 
       name: 'confirmPassword', 
@@ -716,6 +946,26 @@ key: 'estadoVista', // ✅ Usar estadoVista
       required: true 
     },
   ];
+
+  // 👉 NUEVO: campos para asignar club
+  const clubFields = [
+    {
+      name: 'id_club',
+      label: 'Club',
+      type: 'select',
+      required: true,
+      placeholder: 'Seleccione un club',
+      options: clubs,
+    },
+  ];
+
+  const filteredUsuarios = Array.isArray(usuarios)
+    ? usuarios.filter(u => {
+        const term = searchTerm.toLowerCase();
+        return (u.nombreCompleto ?? '').toLowerCase().includes(term)
+            || (u.email ?? '').toLowerCase().includes(term);
+      })
+    : [];
 
   return (
     <div>
@@ -735,14 +985,29 @@ key: 'estadoVista', // ✅ Usar estadoVista
             onClick={fetchUsuarios}
             className="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
           >
-            Reintentar
+          Reintentar
           </button>
         </div>
       )}
 
       {nacError && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-          No se pudieron cargar las nacionalidades: {nacError}
+          ⚠️ No se pudieron cargar las nacionalidades: {nacError}
+        </div>
+      )}
+      {depError && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar los departamentos: {depError}
+        </div>
+      )}
+      {provError && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar las provincias: {provError}
+        </div>
+      )}
+      {clubError && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar los clubes: {clubError}
         </div>
       )}
 
@@ -769,28 +1034,26 @@ key: 'estadoVista', // ✅ Usar estadoVista
         </button>
       </div>
 
-     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <div className="bg-white rounded-lg shadow-sm p-4">
-    <p className="text-gray-600 text-sm">Total Usuarios</p>
-    <p className="text-2xl font-bold text-gray-900">
-      {loading ? '...' : usuarios.length}
-    </p>
-  </div>
-  <div className="bg-white rounded-lg shadow-sm p-4">
-    <p className="text-gray-600 text-sm">Activos</p>
-    <p className="text-2xl font-bold text-green-600">
-      {/* ✅ Usar estadoVista */}
-      {loading ? '...' : usuarios.filter(u => u.estadoVista === 'activo').length}
-    </p>
-  </div>
-  <div className="bg-white rounded-lg shadow-sm p-4">
-    <p className="text-gray-600 text-sm">Inactivos</p>
-    <p className="text-2xl font-bold text-red-600">
-      {/* ✅ Usar estadoVista */}
-      {loading ? '...' : usuarios.filter(u => u.estadoVista === 'inactivo').length}
-    </p>
-  </div>
-</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <p className="text-gray-600 text-sm">Total Usuarios</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {loading ? '...' : usuarios.length}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <p className="text-gray-600 text-sm">Activos</p>
+          <p className="text-2xl font-bold text-green-600">
+            {loading ? '...' : usuarios.filter(u => u.estadoVista === 'activo').length}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <p className="text-gray-600 text-sm">Inactivos</p>
+          <p className="text-2xl font-bold text-red-600">
+            {loading ? '...' : usuarios.filter(u => u.estadoVista === 'inactivo').length}
+          </p>
+        </div>
+      </div>
 
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -811,8 +1074,8 @@ key: 'estadoVista', // ✅ Usar estadoVista
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateUsuario}
         title="Crear Nuevo Usuario"
-        size="2xl"
-        fields={createUsuarioFields}
+        size="7xl"
+        fields={getCreateUsuarioFields()}
         initialData={{
           ci: '',
           nombre: '',
@@ -820,6 +1083,8 @@ key: 'estadoVista', // ✅ Usar estadoVista
           am: '',
           fnac: '',
           id_nacionalidad: '',
+          id_departamento: '',
+          id_provincia_origen: '',
           genero: '',
           email: '',
           rol: 'secretario',
@@ -828,26 +1093,16 @@ key: 'estadoVista', // ✅ Usar estadoVista
         }}
       />
 
-      {/* ✅ EDITAR PERSONA - CORREGIDO */}
+      {/* Editar persona */}
       <FormModal
         key={`persona-${editingUsuario?.id || 'new'}`}
         isOpen={isPersonaModalOpen}
         onClose={() => { setIsPersonaModalOpen(false); setEditingUsuario(null); }}
         onSubmit={handlePersonaSubmit}
         title="Editar Datos Personales"
-        fields={personaFields}
-        initialData={editingUsuario ? {
-          ci: editingUsuario.ci ?? '',
-          nombre: editingUsuario.nombre ?? '',
-          ap: editingUsuario.ap ?? '',
-          am: editingUsuario.am ?? '',
-          id_nacionalidad: editingUsuario.id_nacionalidad != null 
-            ? String(editingUsuario.id_nacionalidad) 
-            : '',
-          genero: editingUsuario.genero 
-            ? String(editingUsuario.genero).toLowerCase().trim()
-      : '',
-        } : {}}
+        size="7xl"
+        fields={getPersonaFields()}
+        initialData={getInitialDataForEdit(editingUsuario)}
       />
 
       {/* Cambiar email */}
@@ -857,6 +1112,7 @@ key: 'estadoVista', // ✅ Usar estadoVista
         onSubmit={handleEmailSubmit}
         title="Cambiar Email"
         fields={emailFields}
+        size="2xl"
         initialData={editingUsuario ? { email: editingUsuario.email ?? '' } : {}}
       />
 
@@ -867,6 +1123,7 @@ key: 'estadoVista', // ✅ Usar estadoVista
         onSubmit={handleRoleSubmit}
         title="Cambiar Rol de Usuario"
         fields={roleFields}
+        size="2xl"
         initialData={editingUsuario ? { rol: editingUsuario.rol ?? 'secretario' } : {}}
       />
 
@@ -877,7 +1134,26 @@ key: 'estadoVista', // ✅ Usar estadoVista
         onSubmit={handlePasswordSubmit}
         title="Cambiar Contraseña"
         fields={passwordFields}
+        size="2xl"
         initialData={{ password: '', confirmPassword: '' }}
+      />
+
+      {/* 👉 NUEVO: Asignar club */}
+      <FormModal
+        key={`club-${usuarioClub?.id || 'new'}`}
+        isOpen={isClubModalOpen}
+        onClose={() => { setIsClubModalOpen(false); setUsuarioClub(null); }}
+        onSubmit={handleClubSubmit}
+        title="Asignar club al usuario"
+        size="2xl"
+        fields={clubFields}
+        initialData={usuarioClub ? {
+          id_club: usuarioClub.id_club ? String(usuarioClub.id_club) : '',
+          id_usuario: usuarioClub.id_usuario ? String(usuarioClub.id_usuario) : (editingUsuario?.id ? String(editingUsuario.id) : '')
+        } : {
+          id_usuario: editingUsuario?.id ? String(editingUsuario.id) : ''
+        }}
+
       />
     </div>
   );

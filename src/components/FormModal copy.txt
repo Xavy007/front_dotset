@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronDown, Eye, EyeOff, AlertCircle, ArrowRight, Loader } from 'lucide-react';
+import { X, ChevronDown, Eye, EyeOff, AlertCircle, CheckCircle, ArrowRight, Loader } from 'lucide-react';
 import DateTimePicker from './DateTimePicker';
+
+// ===============================================
+// FORMMODAL CON DEBUG Y FIX DE TIPOS
+// ===============================================
 
 export default function FormModal({ 
   isOpen, 
@@ -20,9 +24,16 @@ export default function FormModal({
   const fileInputsRef = useRef({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ✅ DEBUG: Log cuando cambia initialData
+  useEffect(() => {
+    console.log('🔵 FormModal - isOpen:', isOpen);
+    console.log('🔵 FormModal - initialData recibido:', initialData);
+  }, [isOpen, initialData]);
+
   useEffect(() => {
     if (isOpen) {
       if (initialData && Object.keys(initialData).length > 0) {
+        // ✅ FIX: Convertir TODOS los valores a string para que coincidan con las options
         const normalizedData = {};
         Object.entries(initialData).forEach(([key, value]) => {
           if (value === null || value === undefined) {
@@ -33,6 +44,8 @@ export default function FormModal({
             normalizedData[key] = value;
           }
         });
+        
+        console.log('✅ FormModal - Datos normalizados:', normalizedData);
         setFormData(normalizedData);
       } else {
         const emptyData = {};
@@ -45,6 +58,7 @@ export default function FormModal({
             emptyData[field.name] = '';
           }
         });
+        console.log('📋 FormModal - Datos vacíos:', emptyData);
         setFormData(emptyData);
       }
       setShowPasswords({});
@@ -54,6 +68,9 @@ export default function FormModal({
     }
   }, [isOpen, initialData, fields]);
 
+  // ============================================
+  // CONVERTIR FECHA DE Date A dd/mm/yyyy
+  // ============================================
   const convertirFecha = (dateObj) => {
     if (!dateObj) return '';
     
@@ -76,7 +93,15 @@ export default function FormModal({
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // Crear copia de datos
       const datosConvertidos = { ...formData };
+      
+      // ← CONVERSIÓN DE fnac (solo si existe)
+      /*if (datosConvertidos.fnac) {
+        datosConvertidos.fnac = convertirFecha(datosConvertidos.fnac);
+      }*/
+      
+      console.log('📤 FormModal - Enviando datos:', datosConvertidos);
       await onSubmit(datosConvertidos);
     } finally {
       setIsSubmitting(false);
@@ -93,6 +118,7 @@ export default function FormModal({
   };
 
   const handleFieldChange = (fieldName, value) => {
+    console.log(`📝 Campo ${fieldName} cambió a:`, value, `(tipo: ${typeof value})`);
     setFormData({ ...formData, [fieldName]: value });
     if (errors[fieldName]) {
       setErrors({ ...errors, [fieldName]: null });
@@ -125,25 +151,34 @@ export default function FormModal({
     '6xl': 'sm:max-w-6xl md:max-w-6xl lg:max-w-6xl',
     '7xl': 'sm:max-w-7xl md:max-w-7xl lg:max-w-7xl',
     full: 'w-[95vw] sm:w-[98vw]',
-    fullscreen: 'w-[95vw] sm:w-[98vw]',
-    mega: 'w-[95vw] sm:w-[98vw]',
+    'fullscreen': 'w-[95vw] sm:w-[98vw]',
+    'mega': 'w-[95vw] sm:w-[98vw]',
   };
 
   const getFieldOptions = (fieldName) => {
     const field = fields.find(f => f.name === fieldName);
-    if (!field) return [];
+    if (!field) {
+      console.warn(`⚠️ Campo no encontrado: ${fieldName}`);
+      return [];
+    }
 
+    // Primero intentar con getDynamicOptions si existe
     if (field.getDynamicOptions && typeof field.getDynamicOptions === 'function') {
       try {
         const dynamicOpts = field.getDynamicOptions(formData);
+        console.log(`🔄 getDynamicOptions(${fieldName}):`, dynamicOpts);
         return Array.isArray(dynamicOpts) ? dynamicOpts : [];
-      } catch {
+      } catch (err) {
+        console.error(`❌ Error en getDynamicOptions(${fieldName}):`, err);
         const fallback = Array.isArray(field.options) ? field.options : [];
+        console.log(`↩️ Usando fallback para ${fieldName}:`, fallback);
         return fallback;
       }
     }
 
+    // Si no hay getDynamicOptions, retornar las opciones estáticas
     const staticOpts = Array.isArray(field.options) ? field.options : [];
+    console.log(`📋 Opciones estáticas de ${fieldName}:`, staticOpts);
     return staticOpts;
   };
 
@@ -154,11 +189,24 @@ export default function FormModal({
     const hasValue = fieldValue && (typeof fieldValue === 'string' ? String(fieldValue).length > 0 : true);
     const options = getFieldOptions(field.name);
 
+    // ✅ DEBUG para selects
+    if (field.type === 'select') {
+      console.log(`🎯 SELECT ${field.name}:`, {
+        valorActual: fieldValue,
+        tipoValor: typeof fieldValue,
+        cantidadOpciones: options.length,
+        opciones: options.slice(0, 3), // Solo primeras 3
+        coincide: options.some(o => String(o.value) === String(fieldValue))
+      });
+    }
+
     switch (field.type) {
+
+      // 🚀 DATETIME PICKER CON LÍNEA ABAJO
       case 'datetime':
       case 'date':
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -182,9 +230,10 @@ export default function FormModal({
           </div>
         );
 
+      // ✅ RADIO BUTTONS CON LÍNEA
       case 'radio':
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-base sm:text-sm font-bold transition-all duration-300 mb-4 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -221,10 +270,11 @@ export default function FormModal({
           </div>
         );
 
-      case 'checkbox': {
+      // ✅ CHECKBOXES CON LÍNEA
+      case 'checkbox':
         const checkboxValue = Array.isArray(fieldValue) ? fieldValue : [];
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-base sm:text-sm font-bold transition-all duration-300 mb-4 sm:mb-2
               ${checkboxValue.length > 0 ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -269,9 +319,9 @@ export default function FormModal({
             )}
           </div>
         );
-      }
 
-      case 'toggle': {
+      // ✅ TOGGLE SWITCH CON LÍNEA
+      case 'toggle':
         const isOn = fieldValue === true || fieldValue === 'true';
         return (
           <div className="relative pt-2 sm:pt-1 pb-3 sm:pb-2 border-b-2 border-gray-300">
@@ -307,11 +357,11 @@ export default function FormModal({
             )}
           </div>
         );
-      }
 
+      // ✅ COLOR PICKER CON LÍNEA
       case 'color':
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -341,9 +391,10 @@ export default function FormModal({
           </div>
         );
 
+      // ✅ RANGE/SLIDER CON LÍNEA
       case 'range':
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -370,9 +421,10 @@ export default function FormModal({
           </div>
         );
 
+      // ✅ FILE CON LÍNEA
       case 'file':
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -411,9 +463,10 @@ export default function FormModal({
           </div>
         );
 
+      // ✅ TEXTAREA CON LÍNEA ABAJO
       case 'textarea':
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -453,11 +506,13 @@ export default function FormModal({
           </div>
         );
 
-      case 'select': {
+      // ✅ SELECT CON LÍNEA ABAJO - CORREGIDO PARA COMPARAR COMO STRINGS
+      case 'select':
+        // ✅ FIX: Convertir valor a string para comparación
         const selectValue = fieldValue !== null && fieldValue !== undefined ? String(fieldValue) : '';
         
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${selectValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -467,12 +522,14 @@ export default function FormModal({
             </label>
             
             <select
+              key={`select-${field.name}-${options.length}`}
               name={field.name}
               value={selectValue}
               onChange={(e) => {
                 const value = e.target.value;
                 let newData = { ...formData, [field.name]: value };
                 
+                // Si hay resetChildren, limpiar esos campos
                 if (field.resetChildren && Array.isArray(field.resetChildren)) {
                   field.resetChildren.forEach(childField => {
                     newData[childField] = '';
@@ -480,6 +537,7 @@ export default function FormModal({
                 }
                 
                 setFormData(newData);
+                console.log(`✅ Campo ${field.name} cambió a:`, value);
               }}
               onFocus={() => setFocusedField(field.name)}
               onBlur={() => handleFieldBlur(field.name)}
@@ -524,12 +582,12 @@ export default function FormModal({
             )}
           </div>
         );
-      }
 
-      case 'password': {
+      // ✅ PASSWORD CON LÍNEA ABAJO
+      case 'password':
         const isVisible = showPasswords[field.name] || false;
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -582,11 +640,11 @@ export default function FormModal({
             )}
           </div>
         );
-      }
 
+      // ✅ DEFAULT (text, email, number, etc) CON LÍNEA ABAJO
       default:
         return (
-          <div className="relative pt-2 sm:pt-1">
+          <div className="relative pt-2 sm:pt-1" key={`select-wrapper-${field.name}-${options.length}`}>
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
               ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
@@ -673,6 +731,7 @@ export default function FormModal({
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-5">
               {fields.map((field) => {
+                // Determinar el ancho del campo según cols
                 let colSpanClass = '';
                 if (field.cols === 1) {
                   colSpanClass = 'md:col-span-1 lg:col-span-1';
@@ -683,16 +742,16 @@ export default function FormModal({
                 }
 
                 return (
-                  <div 
-                    key={field.name} 
-                    className={colSpanClass}
-                  >
-                    {renderField(field)}
+                <div 
+                  key={field.name} 
+                  className={colSpanClass}
+                >
+                  {renderField(field)}
 
-                    {field.helpText && !errors[field.name] && (
-                      <p className="text-sm sm:text-xs text-gray-600 sm:text-gray-500 mt-2 ml-1 sm:ml-0 font-medium">{field.helpText}</p>
-                    )}
-                  </div>
+                  {field.helpText && !errors[field.name] && (
+                    <p className="text-sm sm:text-xs text-gray-600 sm:text-gray-500 mt-2 ml-1 sm:ml-0 font-medium">{field.helpText}</p>
+                  )}
+                </div>
                 );
               })}
             </div>

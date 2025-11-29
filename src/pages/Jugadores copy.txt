@@ -1,0 +1,1146 @@
+// ===============================================
+// ARCHIVO: src/pages/JugadoresPage.jsx (v4 - CON INSCRIPCIONES)
+// ===============================================
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Users, Plus, Search, AlertCircle, X, Pencil, Trash2, UserCheck } from 'lucide-react';
+import DataTable from '../components/Datatable';
+import FormModal from '../components/FormModal';
+import InscripcionParticipacionModal from '../components/InscripcionParticipacionModal';
+import { 
+  obtenerCategoriasPorEdad, 
+  obtenerCategoriasPermitidas 
+} from '../utils/categoriasPorEdad';
+
+export function JugadoresPage() {
+  // ============================================
+  // CONFIG API
+  // ============================================
+  const API_BASE_URL = 'http://localhost:8080/api';
+  const API_URLNacionalidad = 'http://localhost:8080/api/nacionalidad/';
+  const API_URLClub = 'http://localhost:8080/api/club';
+  const API_URLDepartamento = 'http://localhost:8080/api/departamentos';
+  const API_URLProvincia = 'http://localhost:8080/api/provincias';
+
+  // ============================================
+  // ESTADO: Datos principales
+  // ============================================
+  const [jugadores, setJugadores] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isInscripcionModalOpen, setIsInscripcionModalOpen] = useState(false);
+  const [editingJugador, setEditingJugador] = useState(null);
+  const [selectedJugadorInscripcion, setSelectedJugadorInscripcion] = useState(null);
+  const [categoriasPermitidas, setCategoriasPermitidas] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // ✅ ESTADO: Nacionalidades, Clubes, Departamentos, Provincias
+  const [nacionalidades, setNacionalidades] = useState([]);
+  const [clubs, setClubs] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [provincias, setProvincias] = useState([]);
+
+  const [nacError, setNacError] = useState(null);
+  const [clubError, setClubError] = useState(null);
+  const [depError, setDepError] = useState(null);
+  const [provError, setProvError] = useState(null);
+
+  // 🔹 ESTADO para filtros en cascada
+  const [selectedNacionalidad, setSelectedNacionalidad] = useState('');
+  const [selectedDepartamento, setSelectedDepartamento] = useState('');
+
+  // ✅ NUEVO: Estado para preview de imagen
+  const [imagePreview, setImagePreview] = useState(null);
+
+  // ============================================
+  // HELPERS PARA RECIBIR DATOS
+  // ============================================
+  const pickArrayJugadores = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.jugadores)) return data.jugadores;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
+  };
+
+  const pickArrayN = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.nacionalidades)) return data.nacionalidades;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const pickArrayC = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.clubs)) return data.clubs;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const pickArrayD = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.departamentos)) return data.departamentos;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const pickArrayP = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.provincias)) return data.provincias;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const flattenJugador = (j) => {
+    const p = j.Persona || j.persona || {};
+
+    const nombrePersona = p.nombre || '';
+    const ap = p.ap || '';
+    const am = p.am || '';
+    const nombreCompletoPersona = [nombrePersona, ap, am].filter(Boolean).join(' ').trim();
+
+    const nombre = nombreCompletoPersona || j.nombre || `Jugador ${j.id_jugador || j.id || ''}`.trim();
+
+    // Nacionalidad
+    const id_nacionalidad = p.id_nacionalidad ?? j.id_nacionalidad ?? null;
+    const pais = p.nacionalidad?.pais ?? j.nacionalidad?.pais ?? null;
+
+    // Club
+    const id_club = j.id_club ?? null;
+    const nombreClub = j.Club?.nombre || j.club?.nombre || null;
+
+    // Departamento y Provincia
+    const id_departamento = p.id_departamento ?? null;
+    const nombreDepartamento =
+      p.departamento?.nombre || p.Departamento?.nombre || null;
+
+    const id_provincia_origen = p.id_provincia_origen ?? null;
+    const nombreProvincia =
+      p.provinciaOrigen?.nombre || p.Provincia?.nombre || null;
+
+    // Fecha de nacimiento
+    const fnac = p.fnac || null;
+
+    // Dorsal y Foto
+    const dorsal = j.dorsal || null;
+    const foto = j.foto || null;
+
+    return {
+      id: j.id_jugador || j.id || 'sin-id',
+      id_jugador: j.id_jugador || j.id,
+      id_persona: j.id_persona,
+
+      nombre,
+
+      estatura: j.estatura || 0,
+      id_club,
+      nombreClub,
+
+      id_nacionalidad,
+      pais,
+
+      genero: (p.genero || '').toLowerCase() || null,
+
+      id_departamento,
+      nombreDepartamento,
+      id_provincia_origen,
+      nombreProvincia,
+
+      fnac,
+      dorsal,
+      foto,
+
+      freg: j.freg || null,
+      raw: j,
+    };
+  };
+
+  // ============================================
+  // FUNCIÓN AUXILIAR: Formatear fecha (ROBUSTA)
+  // ============================================
+  const formatDate = (dateValue) => {
+    console.log(`🔍 formatDate() recibió:`, dateValue, `tipo: ${typeof dateValue}`);
+    
+    if (!dateValue) {
+      console.log(`✅ Fecha vacía, retornando string vacío`);
+      return '';
+    }
+    
+    if (typeof dateValue === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        console.log(`✅ Fecha ya correcta (yyyy-MM-dd): ${dateValue}`);
+        return dateValue;
+      }
+      
+      if (dateValue.includes('T')) {
+        try {
+          const datePart = dateValue.split('T')[0];
+          console.log(`📅 Extrayendo fecha ISO: ${dateValue} → ${datePart}`);
+          return datePart;
+        } catch (e) {
+          console.error(`❌ Error extrayendo fecha ISO`, e);
+        }
+      }
+    }
+    
+    try {
+      const date = new Date(dateValue);
+      
+      if (isNaN(date.getTime())) {
+        console.error(`❌ Fecha inválida: ${dateValue}`);
+        return '';
+      }
+      
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const formatted = `${year}-${month}-${day}`;
+      
+      console.log(`📅 Convertida desde Date: ${dateValue} → ${formatted}`);
+      return formatted;
+    } catch (e) {
+      console.error(`❌ Error en formatDate:`, e);
+      return '';
+    }
+  };
+
+  // ============================================
+  // HELPER: Calcular edad
+  // ============================================
+  const calcularEdad = (fnac) => {
+    if (!fnac) return null;
+    const hoy = new Date();
+    const nacimiento = new Date(fnac);
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const mes = hoy.getMonth() - nacimiento.getMonth();
+    
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+      edad--;
+    }
+    return edad;
+  };
+
+  // ============================================
+  // CARGAR NACIONALIDADES
+  // ============================================
+  const fetchNacionalidades = async () => {
+    setNacError(null);
+    try {
+      const res = await fetch(API_URLNacionalidad, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error al cargar nacionalidades');
+      const data = await res.json();
+      const arr = pickArrayN(data);
+
+      const opts = arr.map((n) => ({
+        label: n.pais ?? `#${n.id_nacionalidad}`,
+        value: String(n.id_nacionalidad),
+        raw: n,
+      }));
+
+      setNacionalidades(opts);
+    } catch (e) {
+      console.error(e);
+      setNacError(e.message || 'No se pudo cargar nacionalidades');
+      setNacionalidades([]);
+    }
+  };
+
+  // ============================================
+  // CARGAR CLUBES
+  // ============================================
+  const fetchClubs = async () => {
+    setClubError(null);
+    try {
+      const res = await fetch(API_URLClub, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error al cargar clubes');
+      const data = await res.json();
+      const arr = pickArrayC(data);
+
+      const opts = arr.map((c) => ({
+        label: c.nombre ?? `#${c.id_club}`,
+        value: String(c.id_club),
+        raw: c,
+      }));
+
+      setClubs(opts);
+    } catch (e) {
+      console.error(e);
+      setClubError(e.message || 'No se pudo cargar clubes');
+      setClubs([]);
+    }
+  };
+
+  // ============================================
+  // CARGAR DEPARTAMENTOS
+  // ============================================
+  const fetchDepartamentos = async () => {
+    setDepError(null);
+    try {
+      const res = await fetch(API_URLDepartamento, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error al cargar departamentos');
+      const data = await res.json();
+      const arr = pickArrayD(data);
+
+      const opts = arr.map((d) => ({
+        label: d.nombre ?? `#${d.id_departamento}`,
+        value: String(d.id_departamento),
+        id_nacionalidad: d.id_nacionalidad,
+        raw: d,
+      }));
+
+      setDepartamentos(opts);
+    } catch (e) {
+      console.error(e);
+      setDepError(e.message || 'No se pudieron cargar departamentos');
+      setDepartamentos([]);
+    }
+  };
+
+  // ============================================
+  // CARGAR PROVINCIAS
+  // ============================================
+  const fetchProvincias = async () => {
+    setProvError(null);
+    try {
+      const res = await fetch(API_URLProvincia, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error al cargar provincias');
+      const data = await res.json();
+      const arr = pickArrayP(data);
+
+      const opts = arr.map((p) => ({
+        label: p.nombre,
+        value: String(p.id_provincia),
+        id_departamento: p.id_departamento,
+        raw: p,
+      }));
+
+      setProvincias(opts);
+    } catch (e) {
+      console.error(e);
+      setProvError(e.message || 'No se pudieron cargar provincias');
+      setProvincias([]);
+    }
+  };
+
+  // ============================================
+  // CARGAR CATEGORÍAS
+  // ============================================
+  const fetchCategorias = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categorias`);
+      if (!res.ok) throw new Error('Error cargando categorías');
+      const data = await res.json();
+      
+      const arr = Array.isArray(data) ? data : (data?.categorias || data?.data || []);
+      setCategorias(arr);
+    } catch (err) {
+      console.error('Error cargando categorías:', err);
+      setCategorias([]);
+    }
+  };
+
+  // ============================================
+  // CARGAR JUGADORES
+  // ============================================
+  const fetchJugadores = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch(`${API_BASE_URL}/jugadores`);
+
+      if (!res.ok) {
+        throw new Error(`Error HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const response = await res.json();
+      const arr = pickArrayJugadores(response);
+
+      if (!Array.isArray(arr)) {
+        throw new Error(`La respuesta de jugadores no es un array. Tipo: ${typeof arr}`);
+      }
+
+      const mapped = arr.map(flattenJugador);
+      setJugadores(mapped);
+    } catch (err) {
+      const errorMsg = err.message || 'Error desconocido';
+      console.error('❌ Error en fetchJugadores:', err);
+      setError(errorMsg);
+      setJugadores([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar todo al montar
+  useEffect(() => {
+    fetchJugadores();
+    fetchNacionalidades();
+    fetchClubs();
+    fetchDepartamentos();
+    fetchProvincias();
+    fetchCategorias();
+  }, []);
+
+  // ✅ EFECTO: Cuando cambias de jugador a editar, setear selección para cascada
+  useEffect(() => {
+    if (editingJugador) {
+      console.log('📝 Editando jugador:', editingJugador);
+      
+      const persona = editingJugador.raw?.Persona || editingJugador.raw?.persona || {};
+      
+      setSelectedNacionalidad(
+        persona.id_nacionalidad != null
+          ? String(persona.id_nacionalidad)
+          : ''
+      );
+      setSelectedDepartamento(
+        persona.id_departamento != null
+          ? String(persona.id_departamento)
+          : ''
+      );
+    } else {
+      setSelectedNacionalidad('');
+      setSelectedDepartamento('');
+    }
+  }, [editingJugador]);
+
+  // ============================================
+  // OPCIONES FILTRADAS (CASCADA)
+  // ============================================
+  const departamentosFiltrados = selectedNacionalidad
+    ? departamentos.filter(
+        (d) =>
+          d.id_nacionalidad != null &&
+          String(d.id_nacionalidad) === String(selectedNacionalidad)
+      )
+    : departamentos;
+
+  const provinciasFiltradas = selectedDepartamento
+    ? provincias.filter(
+        (p) =>
+          p.id_departamento != null &&
+          String(p.id_departamento) === String(selectedDepartamento)
+      )
+    : provincias;
+
+  // ============================================
+  // CRUD OPERATIONS
+  // ============================================
+  
+  const handleCloseModal = () => {
+    setIsCreateModalOpen(false);
+    setEditingJugador(null);
+    setSelectedNacionalidad('');
+    setSelectedDepartamento('');
+    setImagePreview(null);
+  };
+
+  const handleCloseInscripcion = () => {
+    setIsInscripcionModalOpen(false);
+    setSelectedJugadorInscripcion(null);
+    setCategoriasPermitidas([]);
+  };
+
+  const handleCreate = () => {
+    setEditingJugador(null);
+    setImagePreview(null);
+    setIsCreateModalOpen(true);
+  };
+
+  // ✅ INSCRIBIR: Abrir modal de inscripción
+  const handleInscribir = (jugador) => {
+    console.log('📋 Inscribiendo jugador:', jugador);
+    
+    if (!jugador.fnac) {
+      alert('⚠️ El jugador debe tener una fecha de nacimiento para poder inscribirse');
+      return;
+    }
+
+    const permitidas = obtenerCategoriasPermitidas(jugador.fnac, categorias);
+    
+    if (permitidas.length === 0) {
+      alert('❌ Este jugador no tiene categorías permitidas según su edad');
+      return;
+    }
+
+    setSelectedJugadorInscripcion(jugador);
+    setCategoriasPermitidas(permitidas);
+    setIsInscripcionModalOpen(true);
+  };
+
+  const handleInscripcionSuccess = () => {
+    console.log('✅ Inscripción exitosa, recargando jugadores');
+    fetchJugadores();
+  };
+
+  // ✅ EDITAR: Fetch del jugador completo
+  const handleEdit = async (jugador) => {
+    try {
+      setLoading(true);
+      
+      console.log('🔍 Editando jugador con ID:', jugador.id_jugador);
+      
+      const res = await fetch(`${API_BASE_URL}/jugadores/${jugador.id_jugador}`);
+      
+      if (!res.ok) {
+        throw new Error(`Error HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const response = await res.json();
+      console.log('✅ Respuesta del servidor:', response);
+      
+      const jugadorCompleto = flattenJugador(response.data || response);
+      
+      console.log('✅ Jugador completo procesado:', jugadorCompleto);
+      
+      setEditingJugador(jugadorCompleto);
+      setImagePreview(null);
+      setIsCreateModalOpen(true);
+    } catch (err) {
+      console.error('❌ Error al cargar jugador:', err);
+      alert(err.message || 'Error al cargar los datos del jugador');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Estás seguro que deseas eliminar este jugador?')) return;
+
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/jugadores/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch {
+          errorData = null;
+        }
+        throw new Error(errorData?.message || 'Error al eliminar jugador');
+      }
+
+      setJugadores((prev) => prev.filter((j) => j.id !== id));
+      alert('Jugador eliminado correctamente');
+    } catch (err) {
+      console.error('❌ Error al eliminar:', err);
+      alert(err.message || 'Error eliminando el jugador');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ SUBMIT DEL FORMULARIO
+  const handleFormSubmit = async (submittedFormData) => {
+    try {
+      setLoading(true);
+
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📤 SUBMIT: Datos ANTES de limpiar:');
+      console.log(submittedFormData);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // ✅ LIMPIAR Y FORMATEAR TODOS LOS DATOS
+      const formDataCleaned = {
+        ci: submittedFormData.ci || '',
+        nombre: submittedFormData.nombre || '',
+        ap: submittedFormData.ap || '',
+        am: submittedFormData.am || '',
+        fnac: formatDate(submittedFormData.fnac),
+        id_nacionalidad: submittedFormData.id_nacionalidad || '',
+        genero: submittedFormData.genero || '',
+        id_departamento: submittedFormData.id_departamento || '',
+        id_provincia_origen: submittedFormData.id_provincia_origen || '',
+        estatura: submittedFormData.estatura || '',
+        dorsal: submittedFormData.dorsal || '',
+        id_club: submittedFormData.id_club || '',
+        foto: submittedFormData.foto || null,
+      };
+
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📤 SUBMIT: Datos DESPUÉS de limpiar:');
+      console.log(formDataCleaned);
+      console.log(`fnac FINAL: "${formDataCleaned.fnac}"`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (editingJugador) {
+        await handleUpdate(editingJugador.id_jugador, formDataCleaned);
+      } else {
+        await handleCreate_Backend(formDataCleaned);
+      }
+
+      handleCloseModal();
+      await fetchJugadores();
+      alert(editingJugador ? 'Jugador actualizado correctamente' : 'Jugador creado exitosamente');
+    } catch (err) {
+      console.error('❌ Error en handleFormSubmit:', err);
+      alert(err.message || 'Error guardando el jugador');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ CREATE
+  const handleCreate_Backend = async (formData) => {
+    console.log('🔵 CREATE - Datos recibidos:', formData);
+
+    const formDataToSend = new FormData();
+
+    const datosPersona = {
+      ci: formData.ci || '',
+      nombre: formData.nombre || '',
+      ap: formData.ap || '',
+      am: formData.am || '',
+      fnac: formData.fnac || '',
+      id_nacionalidad: formData.id_nacionalidad ? Number(formData.id_nacionalidad) : null,
+      genero: formData.genero || '',
+      id_departamento: formData.id_departamento ? Number(formData.id_departamento) : null,
+      id_provincia_origen: formData.id_provincia_origen ? Number(formData.id_provincia_origen) : null,
+    };
+
+    const datosJugador = {
+      id_club: formData.id_club ? Number(formData.id_club) : null,
+      estatura: formData.estatura ? Number(formData.estatura) : 0,
+      dorsal: formData.dorsal ? Number(formData.dorsal) : null,
+    };
+
+    console.log('📋 datosPersona:', datosPersona);
+    console.log('📋 datosJugador:', datosJugador);
+
+    formDataToSend.append('datosPersona', JSON.stringify(datosPersona));
+    formDataToSend.append('datosJugador', JSON.stringify(datosJugador));
+
+    if (formData.foto && formData.foto instanceof File) {
+      console.log('📸 Foto adjunta:', formData.foto.name);
+      formDataToSend.append('foto', formData.foto);
+    }
+
+    const res = await fetch(`${API_BASE_URL}/jugadores`, {
+      method: 'POST',
+      body: formDataToSend,
+    });
+
+    if (!res.ok) {
+      let errorData;
+      try {
+        errorData = await res.json();
+      } catch {
+        errorData = null;
+      }
+      throw new Error(errorData?.message || 'Error al crear jugador');
+    }
+
+    return await res.json();
+  };
+
+  // ✅ UPDATE
+  const handleUpdate = async (id_jugador, formData) => {
+    console.log('🟢 UPDATE - Datos recibidos:', formData);
+
+    const formDataToSend = new FormData();
+
+    const datosPersona = {
+      ci: formData.ci || '',
+      nombre: formData.nombre || '',
+      ap: formData.ap || '',
+      am: formData.am || '',
+      fnac: formData.fnac || '',
+      id_nacionalidad: formData.id_nacionalidad ? Number(formData.id_nacionalidad) : null,
+      genero: formData.genero || '',
+      id_departamento: formData.id_departamento ? Number(formData.id_departamento) : null,
+      id_provincia_origen: formData.id_provincia_origen ? Number(formData.id_provincia_origen) : null,
+    };
+
+    const datosJugador = {
+      id_club: formData.id_club ? Number(formData.id_club) : null,
+      estatura: formData.estatura ? Number(formData.estatura) : 0,
+      dorsal: formData.dorsal ? Number(formData.dorsal) : null,
+    };
+
+    console.log('📋 datosPersona:', datosPersona);
+    console.log('📋 datosJugador:', datosJugador);
+
+    formDataToSend.append('datosPersona', JSON.stringify(datosPersona));
+    formDataToSend.append('datosJugador', JSON.stringify(datosJugador));
+
+    if (formData.foto && formData.foto instanceof File) {
+      console.log('📸 Foto adjunta:', formData.foto.name);
+      formDataToSend.append('foto', formData.foto);
+    }
+
+    const res = await fetch(`${API_BASE_URL}/jugadores/${id_jugador}`, {
+      method: 'PUT',
+      body: formDataToSend,
+    });
+
+    if (!res.ok) {
+      let errorData;
+      try {
+        errorData = await res.json();
+      } catch {
+        errorData = null;
+      }
+      throw new Error(errorData?.message || 'Error al actualizar jugador');
+    }
+
+    return await res.json();
+  };
+
+  // ✅ EXTRAER INITIAL DATA
+  const getInitialDataForEdit = (jugador) => {
+    if (!jugador) return {};
+
+    console.log('🔍 DEBUG - editingJugador completo:', jugador);
+    
+    const persona = jugador.raw?.Persona || jugador.raw?.persona || {};
+    
+    console.log('✅ Persona extraida:', persona);
+
+    const fnacFormateada = formatDate(persona.fnac);
+    console.log(`📅 fnac original: ${persona.fnac}`);
+    console.log(`📅 fnac formateada para input: ${fnacFormateada}`);
+
+    const initialData = {
+      ci: persona.ci || '',
+      nombre: persona.nombre || '',
+      ap: persona.ap || '',
+      am: persona.am || '',
+      fnac: fnacFormateada,
+      id_nacionalidad: persona.id_nacionalidad != null ? String(persona.id_nacionalidad) : '',
+      genero: persona.genero || '',
+      id_departamento: persona.id_departamento != null ? String(persona.id_departamento) : '',
+      id_provincia_origen: persona.id_provincia_origen != null ? String(persona.id_provincia_origen) : '',
+
+      estatura: jugador.estatura || '',
+      dorsal: jugador.dorsal || '',
+      id_club: jugador.id_club != null ? String(jugador.id_club) : '',
+    };
+
+    console.log('✅ initialData preparado:', initialData);
+    return initialData;
+  };
+
+  // Filtrar jugadores
+  const filteredJugadores = jugadores.filter(j =>
+    j.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // ============================================
+  // COLUMNAS DE LA TABLA (MEJORADAS CON EDAD Y CATEGORÍA)
+  // ============================================
+  const columns = [
+    { 
+      key: 'nombre', 
+      label: 'Nombre', 
+      render: (value) => <div className="font-medium text-gray-900">{value}</div> 
+    },
+    {
+      key: 'edad',
+      label: 'Edad',
+      render: (_value, row) => {
+        const edad = calcularEdad(row.fnac);
+        return (
+          <div className="text-center">
+            <span className="inline-block bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full text-sm">
+              {edad ? `${edad} años` : '—'}
+            </span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'categoria',
+      label: 'Categoría',
+      render: (_value, row) => {
+        const { categoria_base } = obtenerCategoriasPorEdad(row.fnac);
+        const permitidas = obtenerCategoriasPermitidas(row.fnac, categorias);
+        
+        return (
+          <div className="text-center">
+            {categoria_base ? (
+              <div>
+                <span className="inline-block bg-green-100 text-green-800 font-bold px-3 py-1 rounded-full text-sm">
+                  {categoria_base}
+                </span>
+                {permitidas.length > 1 && (
+                  <div className="text-xs text-gray-600 mt-1">
+                    +{permitidas.length - 1} más
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="text-red-600 font-bold">❌ Sin categoría</span>
+            )}
+          </div>
+        );
+      }
+    },
+    { 
+      key: 'dorsal', 
+      label: 'Dorsal', 
+      render: (value) => <div className="text-center font-semibold text-gray-900">{value || '—'}</div> 
+    },
+    { 
+      key: 'estatura', 
+      label: 'Estatura (m)', 
+      render: (value) => <div className="text-gray-600">{value || '—'}</div> 
+    },
+    {
+      key: 'nombreClub',
+      label: 'Club',
+      render: (value) => (
+        <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm w-fit">
+          {value || 'Sin club'}
+        </div>
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      render: (_v, row) => {
+        const permitidas = obtenerCategoriasPermitidas(row.fnac, categorias);
+        
+        return (
+          <div className="flex items-center gap-2">
+            {/* Botón Inscribir */}
+            {permitidas.length > 0 ? (
+              <button
+                onClick={() => handleInscribir(row)}
+                title="Inscribir en campeonato"
+                className="p-2 rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
+              >
+                <UserCheck size={18} />
+              </button>
+            ) : (
+              <button
+                disabled
+                title="Jugador sin categoría permitida"
+                className="p-2 rounded-md bg-gray-300 text-gray-600 cursor-not-allowed"
+              >
+                <UserCheck size={18} />
+              </button>
+            )}
+
+            {/* Botón Editar */}
+            <button
+              onClick={() => handleEdit(row)}
+              title="Editar"
+              className="p-2 rounded-md border hover:bg-gray-50 border-gray-200 transition-colors"
+            >
+              <Pencil size={18} />
+            </button>
+
+            {/* Botón Eliminar */}
+            <button
+              onClick={() => handleDelete(row.id)}
+              title="Eliminar"
+              className="p-2 rounded-md border hover:bg-red-50 border-red-200 text-red-600 transition-colors"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+        );
+      }
+    }
+  ];
+
+  // ============================================
+  // CAMPOS DEL FORMULARIO
+  // ============================================
+  const formFields = useMemo(() => [
+    { name: 'ci', label: 'CI', type: 'text', placeholder: 'Ej: 12345678', required: true },
+    { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true },
+    { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true },
+    { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false },
+    { name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false },
+
+    {
+      name: 'id_nacionalidad',
+      label: 'Nacionalidad',
+      type: 'select',
+      required: false,
+      placeholder: 'Seleccione una nacionalidad',
+      options: nacionalidades,
+      onChange: (value) => {
+        console.log('🌍 Nacionalidad seleccionada:', value);
+        setSelectedNacionalidad(value || '');
+        setSelectedDepartamento('');
+      },
+    },
+
+    {
+      name: "id_departamento",
+      label: "Departamento",
+      type: "select",
+      options: departamentosFiltrados,
+      onChange: (value) => {
+        console.log('📍 Departamento seleccionado:', value);
+        setSelectedDepartamento(value);
+      },
+    },
+    {
+      name: "id_provincia_origen",
+      label: "Provincia",
+      type: "select",
+      options: provinciasFiltradas,
+      onChange: (value) => {
+        console.log('📍 Provincia seleccionada:', value);
+      },
+    },
+
+    {
+      name: 'genero',
+      label: 'Género',
+      type: 'select',
+      required: false,
+      placeholder: 'Seleccione un género',
+      options: [
+        { label: 'Masculino', value: 'masculino' },
+        { label: 'Femenino', value: 'femenino' },
+        { label: 'Otro', value: 'otro' },
+      ],
+      onChange: (value) => {
+        console.log('👤 Género seleccionado:', value);
+      },
+    },
+
+    {
+      name: 'estatura',
+      label: 'Estatura (metros)',
+      type: 'number',
+      step: '0.01',
+      placeholder: 'Ej: 1.85',
+      required: true,
+    },
+    {
+      name: 'dorsal',
+      label: 'Dorsal',
+      type: 'number',
+      placeholder: 'Ej: 10',
+      required: false,
+    },
+    {
+      name: 'id_club',
+      label: 'Club',
+      type: 'select',
+      required: true,
+      placeholder: 'Seleccione un club',
+      options: clubs,
+      onChange: (value) => {
+        console.log('⚽ Club seleccionado:', value);
+      },
+    },
+    {
+      name: 'foto',
+      label: 'Foto',
+      type: 'file',
+      accept: 'image/*',
+      required: false,
+      onChange: (file) => {
+        console.log('📸 Foto seleccionada:', file);
+        if (file && file instanceof File) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setImagePreview(e.target.result);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          setImagePreview(null);
+        }
+      },
+    },
+  ], [nacionalidades, clubs, departamentosFiltrados, provinciasFiltradas]);
+
+  const memoizedInitialData = useMemo(
+    () => editingJugador ? getInitialDataForEdit(editingJugador) : {},
+    [editingJugador]
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Jugadores</h1>
+        <p className="text-gray-600 mt-2">Gestiona los jugadores de tu equipo e inscríbelos en campeonatos.</p>
+      </div>
+
+      {/* Errores de carga auxiliares */}
+      {nacError && (
+        <div className="mb-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar las nacionalidades: {nacError}
+        </div>
+      )}
+      {clubError && (
+        <div className="mb-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar los clubes: {clubError}
+        </div>
+      )}
+      {depError && (
+        <div className="mb-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar los departamentos: {depError}
+        </div>
+      )}
+      {provError && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          ⚠️ No se pudieron cargar las provincias: {provError}
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex gap-4 mb-6">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={handleCreate}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Plus size={20} />
+          Nuevo Jugador
+        </button>
+      </div>
+
+      {/* Mensajes globales */}
+      {loading && (
+        <p className="text-blue-600 mb-2 bg-blue-50 p-3 rounded border border-blue-200">
+          ⏳ Procesando...
+        </p>
+      )}
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="text-red-600" size={20} />
+          <div>
+            <p className="text-red-800 font-medium">Error al cargar jugadores</p>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+          <button
+            onClick={fetchJugadores}
+            className="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <p className="text-gray-600 text-sm">Total Jugadores</p>
+          <p className="text-2xl font-bold text-gray-900">{jugadores.length}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <p className="text-gray-600 text-sm">Estatura Promedio</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {jugadores.length > 0
+              ? (jugadores.reduce((sum, j) => sum + (j.estatura || 0), 0) / jugadores.length).toFixed(2)
+              : '—'} m
+          </p>
+        </div>
+      </div>
+
+      {/* TABLA */}
+      {jugadores.length > 0 ? (
+        <div className={`grid gap-6 ${imagePreview ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'}`}>
+          {/* DataTable */}
+          <div className={imagePreview ? 'lg:col-span-2' : 'col-span-1'}>
+            <DataTable
+              data={filteredJugadores}
+              columns={columns}
+              itemsPerPage={5}
+            />
+          </div>
+
+          {/* Preview */}
+          {imagePreview && (
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-sm p-4 sticky top-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Vista Previa de Foto</h3>
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-auto rounded-lg border border-gray-200 object-cover"
+                  />
+                  <button
+                    onClick={() => setImagePreview(null)}
+                    className="absolute top-2 right-2 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                    title="Limpiar vista previa"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mt-3">
+                  {editingJugador ? 'Imagen nueva seleccionada' : 'Imagen lista para cargar'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <Users size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-gray-500">No hay jugadores para mostrar</p>
+          {!loading && !error && (
+            <button
+              onClick={handleCreate}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Agregar el primer jugador
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* FORM MODAL */}
+      <FormModal
+        key={`jugador-${editingJugador?.id || 'new'}`}
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseModal}
+        onSubmit={handleFormSubmit}
+        title={editingJugador ? 'Editar Jugador' : 'Crear Nuevo Jugador'}
+        size="2xl"
+        fields={formFields}
+        initialData={memoizedInitialData}
+      />
+
+      {/* INSCRIPCIÓN MODAL */}
+      <InscripcionParticipacionModal
+        isOpen={isInscripcionModalOpen}
+        onClose={handleCloseInscripcion}
+        jugador={selectedJugadorInscripcion}
+        categoriasPermitidas={categoriasPermitidas}
+        todasCategorias={categorias}
+        onSuccess={handleInscripcionSuccess}
+      />
+    </div>
+  );
+}

@@ -6,7 +6,8 @@ export const PERMISSIONS = {
   admin: {
     dashboard: ['leer'],
     usuarios: ['crear', 'leer', 'actualizar', 'eliminar', 'cambiar_estado', 'cambiar_rol'],
-    /*jugadores: ['crear', 'leer', 'actualizar', 'eliminar'],
+    jugadores: ['crear', 'leer', 'actualizar', 'eliminar'],
+    gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
     eqtecnico: ['crear', 'leer', 'actualizar', 'eliminar'],
     jueces: ['crear', 'leer', 'actualizar', 'eliminar'],
     categorias: ['crear', 'leer', 'actualizar', 'eliminar'],
@@ -14,13 +15,14 @@ export const PERMISSIONS = {
     equipos: ['crear', 'leer', 'actualizar', 'eliminar'],
     campeonatos: ['crear', 'leer', 'actualizar', 'eliminar'],
     canchas: ['crear', 'leer', 'actualizar', 'eliminar'],
-    partidos: ['crear', 'leer', 'actualizar', 'eliminar'],*/
+    partidos: ['crear', 'leer', 'actualizar', 'eliminar'],
     reportes: ['leer'],
     configuracion: ['leer', 'actualizar'],
   },
   
   secretario: {
     dashboard: ['leer'],
+    gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
     jugadores: ['crear', 'leer', 'actualizar'],
     eqtecnico: ['crear', 'leer', 'actualizar'],
     jueces: ['leer'],
@@ -34,6 +36,7 @@ export const PERMISSIONS = {
   },
   
   presidente: {
+    gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
     dashboard: ['leer'],
     jugadores: ['leer'],
     eqtecnico: ['leer'],
@@ -89,7 +92,7 @@ export const tienePermiso = (rol, modulo, accion) => {
 // Obtener usuario actual
 export const getUsuarioActual = () => {
   try {
-    const userStr = localStorage.getItem('user');
+    const userStr = localStorage.getItem('usuario');
     return userStr ? JSON.parse(userStr) : null;
   } catch (error) {
     console.error('Error al obtener usuario:', error);

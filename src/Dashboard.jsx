@@ -18,7 +18,7 @@ import { CanchasPage } from './pages/Canchas';
 import { PartidosPage } from './pages/Partidos';
 import { ConfiguracionPage } from './pages/ConfiguracionPage';
 import { CategoriasPage } from './pages/Categorias';
-
+import { GestionesPage } from './pages/Gestiones';
 // ================================================
 //         FUNCIÓN PÁGINA: DASHBOARD
 // ================================================
@@ -48,11 +48,11 @@ export default function Dashboard() {
   const [userName, setUserName] = useState(''); 
   const [userRol, setUserRol] = useState(''); 
   useEffect(() => {
-    const raw = localStorage.getItem('user');
+    const raw = localStorage.getItem('usuario');
     const rol = raw ? JSON.parse(raw).rol : null; 
     console.log(rol);
     setUserRol(rol);
-    const user = localStorage.getItem('user');
+    const user = localStorage.getItem('usuario');
     console.log(user);
     if (user) {
       try {
@@ -98,6 +98,9 @@ export default function Dashboard() {
         return <CategoriasPage />;
       case 'configuracion':
         return <ConfiguracionPage />;
+      case 'gestiones':
+        return <GestionesPage />;
+        
       default:
         return <DashboardPage />;
     }

@@ -45,6 +45,13 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         module: 'usuarios'
       },
       { 
+        label: 'Gestiones', 
+        icon: User, 
+        page: 'gestiones',
+        module: 'gestiones'
+      },
+
+      { 
         label: 'Jugadores', 
         icon: Users2, 
         page: 'jugadores',
@@ -135,7 +142,7 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         {/* Logo / Título */}
         <div className="h-16 flex items-center justify-center border-b border-gray-800">
           <div className="text-2xl font-bold">
-            {isOpen ? '📊 PuntoSet' : '📊'}
+            {isOpen ? '📊 DOTSET' : '📊'}
           </div>
         </div>
 

@@ -137,7 +137,7 @@ export default function LoginFuturistic() {
         
         if (data.usuario) {
           
-          localStorage.setItem('user', JSON.stringify(data.usuario))
+          localStorage.setItem('usuario', JSON.stringify(data.usuario))
 
         }
 
