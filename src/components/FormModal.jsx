@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronDown, Eye, EyeOff, AlertCircle, ArrowRight, Loader } from 'lucide-react';
 import DateTimePicker from './DateTimePicker';
 
@@ -10,7 +10,9 @@ export default function FormModal({
   subtitle,
   fields = [],
   initialData = null,
-  size = 'mega'
+  size = 'mega',
+  submitText,
+  submitDisabled
 }) {
   const [formData, setFormData] = useState({});
   const [showPasswords, setShowPasswords] = useState({});
@@ -19,10 +21,19 @@ export default function FormModal({
   const [focusedField, setFocusedField] = useState(null);
   const fileInputsRef = useRef({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileObjects, setFileObjects] = useState({});
 
+  const updateFormData = (newData) => {
+    setFormData(prev => ({ ...prev, ...newData }));
+  };
+
+  // ====== PRIMER useEffect: Solo cuando se abre el modal ======
   useEffect(() => {
+    console.log('🔄 useEffect [isOpen] - Modal abierto:', isOpen);
+    
     if (isOpen) {
       if (initialData && Object.keys(initialData).length > 0) {
+        console.log('📝 Cargando initialData:', initialData);
         const normalizedData = {};
         Object.entries(initialData).forEach(([key, value]) => {
           if (value === null || value === undefined) {
@@ -35,8 +46,15 @@ export default function FormModal({
         });
         setFormData(normalizedData);
       } else {
+        console.log('📝 Inicializando formulario vacío');
+        const currentFields = typeof fields === 'function' 
+          ? fields(() => {}) 
+          : Array.isArray(fields) 
+          ? fields 
+          : [];
+
         const emptyData = {};
-        fields.forEach(field => {
+        currentFields.forEach(field => {
           if (field.type === 'checkbox') {
             emptyData[field.name] = [];
           } else if (field.type === 'toggle') {
@@ -51,32 +69,33 @@ export default function FormModal({
       setErrors({});
       setTouchedFields({});
       setFocusedField(null);
+      // ✅ NO limpiar fileObjects aquí - solo cuando el modal se CIERRA
+    } else {
+      // ✅ Limpiar fileObjects solo cuando el modal se CIERRA
+      setFileObjects({});
     }
-  }, [isOpen, initialData, fields]);
+  }, [isOpen]); // ← SOLO isOpen
 
-  const convertirFecha = (dateObj) => {
-    if (!dateObj) return '';
-    
-    if (typeof dateObj === 'string') {
-      dateObj = new Date(dateObj);
-    }
-    
-    if (!(dateObj instanceof Date) || isNaN(dateObj)) {
-      return '';
-    }
-    
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const year = dateObj.getFullYear();
-    
-    return `${day}/${month}/${year}`;
-  };
+  const fieldsArray = typeof fields === 'function' 
+    ? fields(updateFormData) 
+    : Array.isArray(fields) 
+    ? fields 
+    : [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       const datosConvertidos = { ...formData };
+      
+      // Agregar archivos al formData
+      Object.keys(fileObjects).forEach(fieldName => {
+        datosConvertidos[fieldName] = fileObjects[fieldName];
+      });
+      
+      console.log('📦 FormModal - Datos a enviar:', datosConvertidos);
+      console.log('📦 FormModal - Archivos incluidos:', fileObjects);
+      
       await onSubmit(datosConvertidos);
     } finally {
       setIsSubmitting(false);
@@ -89,27 +108,66 @@ export default function FormModal({
     setErrors({});
     setTouchedFields({});
     setFocusedField(null);
+    setFileObjects({});
     onClose();
   };
 
-  const handleFieldChange = (fieldName, value) => {
-    setFormData({ ...formData, [fieldName]: value });
-    if (errors[fieldName]) {
-      setErrors({ ...errors, [fieldName]: null });
+  const handleFieldChange = useCallback((fieldName, value) => {
+    console.log('✏️ handleFieldChange:', fieldName, '=', value);
+    setFormData(prev => {
+      const updated = { ...prev, [fieldName]: value };
+      console.log('📝 FormData actualizado:', updated);
+      return updated;
+    });
+    setErrors(prev => {
+      if (prev[fieldName]) {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      }
+      return prev;
+    });
+  }, []);
+
+  // ====== MODIFICADO: handleFileChange SIN tocar formData ======
+  const handleFileChange = useCallback((fieldName, file, field) => {
+    console.log('📷 handleFileChange - Campo:', fieldName);
+    console.log('📷 handleFileChange - Archivo:', file?.name);
+    console.log('📷 handleFileChange - formData ANTES:', { ...formData });
+    
+    if (file instanceof File) {
+      // SOLO guardar en fileObjects
+      setFileObjects(prev => {
+        const updated = { ...prev, [fieldName]: file };
+        console.log('📦 fileObjects actualizado:', Object.keys(updated));
+        return updated;
+      });
+      
+      // Llamar onChange personalizado si existe (para preview)
+      if (field.onChange && typeof field.onChange === 'function') {
+        console.log('📷 Ejecutando onChange personalizado');
+        field.onChange(file);
+      }
+      
+      console.log('✅ Archivo guardado en fileObjects');
     }
-  };
+  }, []); // ← Sin dependencias para evitar re-renders
 
-  const handleFieldBlur = (fieldName) => {
-    setTouchedFields({ ...touchedFields, [fieldName]: true });
+  const handleFieldBlur = useCallback((fieldName, customOnBlur) => {
+    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
     setFocusedField(null);
-  };
+    
+    if (customOnBlur && typeof customOnBlur === 'function') {
+      customOnBlur(formData[fieldName]);
+    }
+  }, [formData]);
 
-  const togglePasswordVisibility = (fieldName) => {
+  const togglePasswordVisibility = useCallback((fieldName) => {
     setShowPasswords(prev => ({
       ...prev,
       [fieldName]: !prev[fieldName]
     }));
-  };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -130,7 +188,7 @@ export default function FormModal({
   };
 
   const getFieldOptions = (fieldName) => {
-    const field = fields.find(f => f.name === fieldName);
+    const field = fieldsArray.find(f => f.name === fieldName);
     if (!field) return [];
 
     if (field.getDynamicOptions && typeof field.getDynamicOptions === 'function') {
@@ -179,6 +237,12 @@ export default function FormModal({
                 {errors[field.name]}
               </div>
             )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
+              </div>
+            )}
           </div>
         );
 
@@ -202,7 +266,7 @@ export default function FormModal({
                     value={option.value}
                     checked={fieldValue === option.value}
                     onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                    onBlur={() => handleFieldBlur(field.name)}
+                    onBlur={() => handleFieldBlur(field.name, field.onBlur)}
                     className="w-6 sm:w-4 h-6 sm:h-4 accent-blue-600 cursor-pointer"
                   />
                   <span className="text-base sm:text-sm text-gray-800 sm:text-gray-700 font-medium">
@@ -216,6 +280,12 @@ export default function FormModal({
               <div className="flex items-center gap-2 mt-2 text-red-600 text-sm sm:text-xs font-medium">
                 <AlertCircle size={18} className="sm:w-4 sm:h-4" />
                 {errors[field.name]}
+              </div>
+            )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
               </div>
             )}
           </div>
@@ -251,7 +321,7 @@ export default function FormModal({
                       }
                       handleFieldChange(field.name, newValue);
                     }}
-                    onBlur={() => handleFieldBlur(field.name)}
+                    onBlur={() => handleFieldBlur(field.name, field.onBlur)}
                     className="w-6 sm:w-4 h-6 sm:h-4 accent-blue-600 cursor-pointer rounded"
                   />
                   <span className="text-base sm:text-sm text-gray-800 sm:text-gray-700 font-medium">
@@ -265,6 +335,12 @@ export default function FormModal({
               <div className="flex items-center gap-2 mt-2 text-red-600 text-sm sm:text-xs font-medium">
                 <AlertCircle size={18} className="sm:w-4 sm:h-4" />
                 {errors[field.name]}
+              </div>
+            )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
               </div>
             )}
           </div>
@@ -287,7 +363,7 @@ export default function FormModal({
               <button
                 type="button"
                 onClick={() => handleFieldChange(field.name, !isOn)}
-                onBlur={() => handleFieldBlur(field.name)}
+                onBlur={() => handleFieldBlur(field.name, field.onBlur)}
                 className={`
                   relative w-14 sm:w-12 h-8 sm:h-6 rounded-full transition-all duration-300 flex-shrink-0
                   ${isOn ? 'bg-blue-600' : 'bg-gray-300 sm:bg-gray-300'}
@@ -320,22 +396,32 @@ export default function FormModal({
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>
             
-            <div className="flex items-center gap-3 sm:gap-2 p-0 sm:p-0 pb-3 sm:pb-2 border-b-2 border-gray-300">
-              <input
-                type="color"
-                name={field.name}
-                value={fieldValue || '#000000'}
-                onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                onBlur={() => handleFieldBlur(field.name)}
-                className="w-12 sm:w-10 h-12 sm:h-10 rounded cursor-pointer border-2 sm:border border-gray-300"
-              />
-              <span className="text-base sm:text-sm text-gray-700 sm:text-gray-600 font-mono font-bold">{fieldValue || '#000000'}</span>
-            </div>
+            {field.renderCustom && typeof field.renderCustom === 'function' ? (
+              field.renderCustom(formData, handleFieldChange)
+            ) : (
+              <div className="flex items-center gap-3 sm:gap-2 p-0 sm:p-0 pb-3 sm:pb-2 border-b-2 border-gray-300">
+                <input
+                  type="color"
+                  name={field.name}
+                  value={fieldValue || '#000000'}
+                  onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                  onBlur={() => handleFieldBlur(field.name, field.onBlur)}
+                  className="w-12 sm:w-10 h-12 sm:h-10 rounded cursor-pointer border-2 sm:border border-gray-300"
+                />
+                <span className="text-base sm:text-sm text-gray-700 sm:text-gray-600 font-mono font-bold">{fieldValue || '#000000'}</span>
+              </div>
+            )}
 
             {hasError && (
               <div className="flex items-center gap-2 mt-2 text-red-600 text-sm sm:text-xs font-medium">
                 <AlertCircle size={18} className="sm:w-4 sm:h-4" />
                 {errors[field.name]}
+              </div>
+            )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
               </div>
             )}
           </div>
@@ -360,7 +446,7 @@ export default function FormModal({
               max={field.max || 100}
               step={field.step || 1}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              onBlur={() => handleFieldBlur(field.name)}
+              onBlur={() => handleFieldBlur(field.name, field.onBlur)}
               className="w-full h-3 sm:h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 pb-3 sm:pb-2 border-b-2 border-gray-300"
             />
 
@@ -375,7 +461,7 @@ export default function FormModal({
           <div className="relative pt-2 sm:pt-1">
             <label className={`
               block text-lg sm:text-base font-bold transition-all duration-300 mb-3 sm:mb-2
-              ${hasValue ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
+              ${fileObjects[field.name] ? 'text-blue-600' : 'text-gray-700 sm:text-gray-600'}
             `}>
               {field.label}
               {field.required && <span className="text-red-500 ml-1">*</span>}
@@ -389,10 +475,18 @@ export default function FormModal({
               name={field.name}
               accept={field.accept}
               onChange={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
                 const file = e.target.files?.[0];
-                handleFieldChange(field.name, file);
+                if (file) {
+                  console.log('📷 Input onChange - Archivo:', file.name);
+                  handleFileChange(field.name, file, field);
+                }
               }}
-              onBlur={() => handleFieldBlur(field.name)}
+              onBlur={(e) => {
+                e.stopPropagation();
+                handleFieldBlur(field.name, field.onBlur);
+              }}
               required={field.required}
               className="hidden"
               id={field.name}
@@ -406,8 +500,47 @@ export default function FormModal({
               `}
             >
               <span className="text-2xl sm:text-lg">📤</span>
-              <p className="mt-1 sm:mt-0">{fieldValue?.name ? fieldValue.name : 'Selecciona archivo'}</p>
+              <p className="mt-1 sm:mt-0">
+                {fileObjects[field.name]?.name || 'Selecciona archivo'}
+              </p>
             </label>
+
+            {field.helperText && !hasError && (
+              <p className="text-sm sm:text-xs text-gray-600 sm:text-gray-500 mt-2 ml-1 sm:ml-0 font-medium">
+                {field.helperText}
+              </p>
+            )}
+
+            {field.renderCustom && typeof field.renderCustom === 'function' && (
+              <div className="mt-4">
+                {field.renderCustom()}
+              </div>
+            )}
+          </div>
+        );
+
+      // ====== NUEVO: SOPORTE PARA TYPE CUSTOM ======
+      case 'custom':
+        return (
+          <div className="relative pt-2 sm:pt-1">
+            {field.renderCustom ? (
+              field.renderCustom(formData, handleFieldChange)
+            ) : (
+              <div className="text-red-500 font-bold">Error: renderCustom no definido para campo custom</div>
+            )}
+            
+            {hasError && (
+              <div className="flex items-center gap-2 mt-2 text-red-600 text-sm sm:text-xs font-medium">
+                <AlertCircle size={18} className="sm:w-4 sm:h-4" />
+                {errors[field.name]}
+              </div>
+            )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
+              </div>
+            )}
           </div>
         );
 
@@ -427,7 +560,7 @@ export default function FormModal({
               value={fieldValue}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               onFocus={() => setFocusedField(field.name)}
-              onBlur={() => handleFieldBlur(field.name)}
+              onBlur={() => handleFieldBlur(field.name, field.onBlur)}
               placeholder={field.placeholder || " "}
               required={field.required}
               rows={field.rows || 4}
@@ -448,6 +581,12 @@ export default function FormModal({
               <div className="flex items-center gap-2 mt-2 text-red-600 text-sm sm:text-xs font-medium">
                 <AlertCircle size={18} className="sm:w-4 sm:h-4" />
                 {errors[field.name]}
+              </div>
+            )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
               </div>
             )}
           </div>
@@ -471,18 +610,21 @@ export default function FormModal({
               value={selectValue}
               onChange={(e) => {
                 const value = e.target.value;
-                let newData = { ...formData, [field.name]: value };
-                
+                handleFieldChange(field.name, value);
+
                 if (field.resetChildren && Array.isArray(field.resetChildren)) {
                   field.resetChildren.forEach(childField => {
-                    newData[childField] = '';
+                    handleFieldChange(childField, '');
                   });
                 }
-                
-                setFormData(newData);
+
+                // Ejecutar onChange personalizado si existe
+                if (field.onChange && typeof field.onChange === 'function') {
+                  field.onChange(value);
+                }
               }}
               onFocus={() => setFocusedField(field.name)}
-              onBlur={() => handleFieldBlur(field.name)}
+              onBlur={() => handleFieldBlur(field.name, field.onBlur)}
               required={field.required}
               className={`
                 w-full px-0 py-3 sm:py-2 pr-6 sm:pr-4 bg-transparent text-base sm:text-sm text-gray-900
@@ -522,6 +664,12 @@ export default function FormModal({
                 {errors[field.name]}
               </div>
             )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
+              </div>
+            )}
           </div>
         );
       }
@@ -545,7 +693,7 @@ export default function FormModal({
                 value={fieldValue}
                 onChange={(e) => handleFieldChange(field.name, e.target.value)}
                 onFocus={() => setFocusedField(field.name)}
-                onBlur={() => handleFieldBlur(field.name)}
+                onBlur={() => handleFieldBlur(field.name, field.onBlur)}
                 placeholder={field.placeholder || " "}
                 required={field.required}
                 className={`
@@ -580,6 +728,12 @@ export default function FormModal({
                 {errors[field.name]}
               </div>
             )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
+              </div>
+            )}
           </div>
         );
       }
@@ -601,7 +755,7 @@ export default function FormModal({
               value={typeof fieldValue === 'object' ? '' : fieldValue}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               onFocus={() => setFocusedField(field.name)}
-              onBlur={() => handleFieldBlur(field.name)}
+              onBlur={() => handleFieldBlur(field.name, field.onBlur)}
               placeholder={field.placeholder || " "}
               required={field.required}
               step={field.step}
@@ -623,6 +777,12 @@ export default function FormModal({
               <div className="flex items-center gap-2 mt-2 text-red-600 text-sm sm:text-xs font-medium">
                 <AlertCircle size={18} className="sm:w-4 sm:h-4" />
                 {errors[field.name]}
+              </div>
+            )}
+
+            {field.helperText && !hasError && (
+              <div className="mt-2">
+                {field.helperText}
               </div>
             )}
           </div>
@@ -654,7 +814,6 @@ export default function FormModal({
         animate-slide-up border border-gray-200
       `}>
 
-        {/* HEADER */}
         <div className="relative px-5 sm:px-6 py-6 sm:py-4 border-b-2 sm:border-b border-gray-100 bg-gradient-to-r from-blue-50 to-white">
           <h2 className="text-2xl sm:text-xl font-bold text-gray-900 pr-10">{title}</h2>
           {subtitle && <p className="text-gray-600 text-base sm:text-sm mt-2 sm:mt-1 font-medium">{subtitle}</p>}
@@ -667,18 +826,19 @@ export default function FormModal({
           </button>
         </div>
 
-        {/* BODY */}
         <div className="overflow-y-auto flex-1">
           <form onSubmit={handleSubmit} className="px-8 sm:px-6 py-8 sm:py-4 space-y-6 sm:space-y-4">
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-5">
-              {fields.map((field) => {
+              {fieldsArray.map((field) => {
                 let colSpanClass = '';
                 if (field.cols === 1) {
                   colSpanClass = 'md:col-span-1 lg:col-span-1';
                 } else if (field.cols === 2) {
                   colSpanClass = 'md:col-span-2 lg:col-span-2';
                 } else if (field.cols === 3 || field.fullWidth) {
+                  colSpanClass = 'md:col-span-2 lg:col-span-3';
+                } else if (field.cols === 12) {
                   colSpanClass = 'md:col-span-2 lg:col-span-3';
                 }
 
@@ -697,7 +857,6 @@ export default function FormModal({
               })}
             </div>
 
-            {/* FOOTER */}
             <div className="flex gap-3 sm:gap-2 pt-6 sm:pt-4 border-t-2 sm:border-t border-gray-100">
               <button
                 type="button"
@@ -709,8 +868,8 @@ export default function FormModal({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="flex-1 px-6 sm:px-4 py-4 sm:py-2 text-base sm:text-sm bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold rounded-lg sm:rounded hover:shadow-xl sm:hover:shadow-md hover:from-blue-700 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-3 sm:gap-2 group active:scale-95 sm:active:scale-100"
+                disabled={isSubmitting || submitDisabled}
+                className="flex-1 px-6 sm:px-4 py-4 sm:py-2 text-base sm:text-sm bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold rounded-lg sm:rounded hover:shadow-xl sm:hover:shadow-md hover:from-blue-700 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-3 sm:gap-2 group active-scale-95 sm:active:scale-100"
               >
                 {isSubmitting ? (
                   <>
@@ -719,7 +878,7 @@ export default function FormModal({
                   </>
                 ) : (
                   <>
-                    <span>✓ Guardar</span>
+                    <span>{submitText || '✓ Guardar'}</span>
                     <ArrowRight size={22} className="sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}

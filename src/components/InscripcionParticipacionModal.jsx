@@ -17,6 +17,7 @@ export default function InscripcionParticipacionModal({
   // ===== ESTADO =====
   const [campeonatos, setCampeonatos] = useState([]);
   const [equipos, setEquipos] = useState([]);
+  const [campeonatoCategorias, setCampeonatoCategorias] = useState([]); // ✅ NUEVO: Para almacenar id_cc
   const [loading, setLoading] = useState(false);
 
   const [selectedCampeonato, setSelectedCampeonato] = useState(null);
@@ -33,10 +34,10 @@ export default function InscripcionParticipacionModal({
 
   const fetchCampeonatos = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/campeonatos');
+      const res = await fetch('http://localhost:8080/api/campeonato');
       if (!res.ok) throw new Error('Error cargando campeonatos');
       const data = await res.json();
-      
+
       const arr = Array.isArray(data) ? data : (data?.campeonatos || data?.data || []);
       setCampeonatos(arr);
     } catch (error) {
@@ -52,11 +53,26 @@ export default function InscripcionParticipacionModal({
       );
       if (!res.ok) throw new Error('Error cargando equipos');
       const data = await res.json();
-      
+
       const arr = Array.isArray(data) ? data : (data?.equipos || data?.data || []);
       setEquipos(arr);
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  // ✅ NUEVA FUNCIÓN: Obtener CampeonatoCategorias para obtener id_cc
+  const fetchCampeonatoCategorias = async (id_campeonato) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/campeonato-categoria/campeonato/${id_campeonato}`);
+      if (!res.ok) throw new Error('Error cargando categorías del campeonato');
+      const data = await res.json();
+
+      const arr = Array.isArray(data) ? data : (data?.data || []);
+      console.log('📋 CampeonatoCategorias obtenidas:', arr);
+      setCampeonatoCategorias(arr);
+    } catch (error) {
+      console.error('Error cargando campeonato-categorías:', error);
     }
   };
 
@@ -66,6 +82,10 @@ export default function InscripcionParticipacionModal({
     setSelectedCampeonato(id);
     setSelectedCategorias([]);
     setInscripciones([]);
+    // ✅ Cargar las categorías del campeonato para obtener id_cc
+    if (id) {
+      fetchCampeonatoCategorias(id);
+    }
   };
 
   const toggleCategoria = (id_categoria) => {
@@ -84,7 +104,7 @@ export default function InscripcionParticipacionModal({
   };
 
   const agregarInscripcion = (id_categoria) => {
-    const categoria = categoriasPermitidas.find(c => c.id_categoria === id_categoria);
+    const categoria = categoriasPermitidas.find(c => parseInt(c.value || c.id_categoria) === parseInt(id_categoria));
     
     // Validar que no haya duplicada
     if (inscripciones.find(i => i.id_categoria === id_categoria)) {
@@ -126,7 +146,7 @@ export default function InscripcionParticipacionModal({
       id_equipo: parseInt(id_equipo),
       dorsal: parseInt(dorsal),
       posicion,
-      categoria_nombre: categoria?.nombre,
+      categoria_nombre: categoria?.label || categoria?.nombre,
       equipo_nombre: equipo?.nombre
     };
 
@@ -146,23 +166,44 @@ export default function InscripcionParticipacionModal({
 
     setLoading(true);
     try {
-      const promesas = inscripciones.map(inscripcion =>
-        fetch('http://localhost:8080/api/participaciones/inscribir', {
+      const promesas = inscripciones.map(inscripcion => {
+        // ✅ Buscar el id_cc correspondiente a este campeonato y categoría
+        const cc = campeonatoCategorias.find(
+          cc => cc.id_campeonato === selectedCampeonato && cc.id_categoria === inscripcion.id_categoria
+        );
+
+        if (!cc) {
+          throw new Error(`No se encontró la categoría ${inscripcion.id_categoria} en el campeonato`);
+        }
+
+        console.log('📤 Enviando participación:', {
+          id_jugador: jugador.id_jugador,
+          id_campeonato: selectedCampeonato,
+          id_categoria: inscripcion.id_categoria,
+          id_cc: cc.id_cc,
+          id_equipo: inscripcion.id_equipo,
+          dorsal: inscripcion.dorsal,
+          posicion: inscripcion.posicion
+        });
+
+        return fetch('http://localhost:8080/api/participaciones', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id_jugador: jugador.id_jugador,
             id_campeonato: selectedCampeonato,
             id_categoria: inscripcion.id_categoria,
+            id_cc: cc.id_cc, // ✅ NUEVO: Incluir id_cc
             id_equipo: inscripcion.id_equipo,
             dorsal: inscripcion.dorsal,
-            posicion: inscripcion.posicion
+            posicion: inscripcion.posicion,
+            estado: 'activo'
           })
         }).then(res => {
           if (!res.ok) throw new Error('Error guardando inscripción');
           return res.json();
-        })
-      );
+        });
+      });
 
       const resultados = await Promise.all(promesas);
       
@@ -259,22 +300,25 @@ export default function InscripcionParticipacionModal({
                 2️⃣ Selecciona Categoría(s)
               </label>
               <div className="grid grid-cols-2 gap-3">
-                {categoriasPermitidas.map(cat => (
-                  <button
-                    key={cat.id_categoria}
-                    onClick={() => toggleCategoria(cat.id_categoria)}
-                    className={`p-3 border-2 rounded transition ${
-                      selectedCategorias.includes(cat.id_categoria)
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-300 bg-white hover:border-blue-400'
-                    }`}
-                  >
-                    <div className="text-sm font-bold">{cat.nombre}</div>
-                    <div className="text-xs text-gray-600">
-                      {cat.edad_inicio}-{cat.edad_limite} años
-                    </div>
-                  </button>
-                ))}
+                {categoriasPermitidas.map(cat => {
+                  const catId = parseInt(cat.value || cat.id_categoria);
+                  return (
+                    <button
+                      key={catId}
+                      onClick={() => toggleCategoria(catId)}
+                      className={`p-3 border-2 rounded transition ${
+                        selectedCategorias.includes(catId)
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-300 bg-white hover:border-blue-400'
+                      }`}
+                    >
+                      <div className="text-sm font-bold">{cat.label || cat.nombre}</div>
+                      <div className="text-xs text-gray-600">
+                        {cat.edad_inicio}-{cat.edad_limite} años
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -287,7 +331,7 @@ export default function InscripcionParticipacionModal({
               </h3>
 
               {selectedCategorias.map(id_categoria => {
-                const categoria = categoriasPermitidas.find(c => c.id_categoria === id_categoria);
+                const categoria = categoriasPermitidas.find(c => parseInt(c.value || c.id_categoria) === parseInt(id_categoria));
                 const inscrito = inscripciones.find(i => i.id_categoria === id_categoria);
                 const error = errors[id_categoria];
 
@@ -295,7 +339,7 @@ export default function InscripcionParticipacionModal({
                   <div key={id_categoria} className="bg-white p-4 rounded border border-gray-200">
                     {/* HEADER DE CATEGORÍA */}
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-bold text-gray-800">{categoria?.nombre}</h4>
+                      <h4 className="font-bold text-gray-800">{categoria?.label || categoria?.nombre}</h4>
                       {inscrito && (
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-green-600 font-bold">✅ Agregada</span>

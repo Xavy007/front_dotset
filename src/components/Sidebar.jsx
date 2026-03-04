@@ -4,21 +4,25 @@
 // ===============================================
 
 import React, { useState, useMemo } from 'react';
-import { 
-  BarChart3, 
-  Users2, 
-  User, 
-  SquareUserRound, 
-  UserRoundCog, 
-  TrendingUp, 
-  Volleyball, 
-  VolleyballIcon, 
-  Trophy, 
-  MapIcon, 
-  Activity, 
-  Settings, 
+import {
+  BarChart3,
+  Users2,
+  User,
+  SquareUserRound,
+  UserRoundCog,
+  TrendingUp,
+  Volleyball,
+  VolleyballIcon,
+  Trophy,
+  MapIcon,
+  Activity,
+  Settings,
   LogOut,
-  FileText
+  FileText,
+  Calendar,
+  CalendarCog,
+  UserPlus,
+  Medal
 } from 'lucide-react';
 import { LogoutModal } from '../utils/LogoutModal';
 import { handleLogout } from '../utils/auth';
@@ -99,24 +103,48 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         page: 'canchas',
         module: 'canchas'
       },
-      { 
-        label: 'Partidos', 
-        icon: Activity, 
+      {
+        label: 'Partidos',
+        icon: Activity,
         page: 'partidos',
         module: 'partidos'
       },
-      { 
-        label: 'Reportes', 
-        icon: FileText, 
+      {
+        label: 'Cronograma',
+        icon: Calendar,
+        page: 'generar-fixture',
+        module: 'campeonatos' // Mismo permiso que campeonatos
+      },
+      {
+        label: 'Partidos',
+        icon: CalendarCog,
+        page: 'gestion-partidos',
+        module: 'partidos' // Mismo permiso que partidos
+      },
+      {
+        label: 'Inscripciones',
+        icon: UserPlus,
+        page: 'gestion-inscripciones',
+        module: 'campeonatos' // Mismo permiso que campeonatos
+      },
+      {
+        label: 'Reportes',
+        icon: FileText,
         page: 'reportes',
         module: 'reportes'
       },
-      { 
-        label: 'Configuración', 
-        icon: Settings, 
+      {
+        label: 'Posiciones',
+        icon: Medal,
+        page: 'tabla-posiciones',
+        module: 'campeonatos' // Mismo permiso que campeonatos
+      },
+      /*{
+        label: 'Configuración',
+        icon: Settings,
         page: 'configuracion',
         module: 'configuracion'
-      }
+      }*/
     ];
 
     // ✅ Filtrar items según permisos

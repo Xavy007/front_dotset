@@ -5,45 +5,55 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState('calendar');
   const [currentDate, setCurrentDate] = useState(new Date());
-  
+
+  // ⭐ Limitar años permitidos (solo hasta hoy o próximo año si es fin de año)
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const maxYear = todayMonth >= 10 ? todayYear + 1 : todayYear;
+
   // ✅ FIX: Función helper para convertir value a Date
   const parseValue = (val) => {
     if (!val) return null;
-    
+
     // Si ya es un Date válido
     if (val instanceof Date && !isNaN(val)) {
       return val;
     }
-    
+
     // Si es string en formato ISO (yyyy-MM-dd)
     if (typeof val === 'string') {
       // Agregar hora para evitar problemas de zona horaria
       const dateStr = val.includes('T') ? val : `${val}T00:00:00`;
       const parsed = new Date(dateStr);
-      
+
       console.log('📅 DateTimePicker - Parseando fecha:', val, '→', parsed);
-      
+
       if (!isNaN(parsed.getTime())) {
         return parsed;
       }
     }
-    
+
     console.warn('⚠️ DateTimePicker - Valor inválido:', val);
     return null;
   };
-  
+
   const [selectedDate, setSelectedDate] = useState(() => parseValue(value));
   const [hours, setHours] = useState(selectedDate?.getHours() || 0);
   const [minutes, setMinutes] = useState(selectedDate?.getMinutes() || 0);
-  const [selectedYear, setSelectedYear] = useState(selectedDate?.getFullYear() || currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(selectedDate?.getMonth() || currentDate.getMonth());
+  const [selectedYear, setSelectedYear] = useState(
+    selectedDate?.getFullYear() || currentDate.getFullYear()
+  );
+  const [selectedMonth, setSelectedMonth] = useState(
+    selectedDate?.getMonth() || currentDate.getMonth()
+  );
   const containerRef = useRef(null);
 
   // ✅ AGREGAR: Sincronizar selectedDate cuando value cambia desde fuera
   useEffect(() => {
     console.log('🔄 DateTimePicker - value cambió:', value);
     const parsedDate = parseValue(value);
-    
+
     if (parsedDate) {
       setSelectedDate(parsedDate);
       setHours(parsedDate.getHours());
@@ -51,10 +61,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
       setSelectedYear(parsedDate.getFullYear());
       setSelectedMonth(parsedDate.getMonth());
       setCurrentDate(parsedDate);
-      
+
       console.log('✅ DateTimePicker - Estado actualizado:', {
         date: parsedDate,
-        formatted: formatDate(parsedDate)
+        formatted: formatDate(parsedDate),
       });
     }
   }, [value]);
@@ -95,12 +105,30 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
   };
 
   const handleSelectDay = (day) => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const currentDay = today.getDate();
+
+    // ⭐ Evitar seleccionar fechas futuras
+    if (
+      selectedYear > currentYear ||
+      (selectedYear === currentYear && selectedMonth > currentMonth) ||
+      (selectedYear === currentYear &&
+        selectedMonth === currentMonth &&
+        day > currentDay)
+    ) {
+      return;
+    }
+
     const newDate = new Date(selectedYear, selectedMonth, day);
     setSelectedDate(newDate);
-    
+
     if (format === 'dd/mm/yyyy') {
       // ✅ FIX: Devolver en formato yyyy-MM-dd para compatibilidad con backend
-      const formatted = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+      const formatted = `${newDate.getFullYear()}-${String(
+        newDate.getMonth() + 1
+      ).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
       console.log('📅 DateTimePicker - Fecha seleccionada:', formatted);
       onChange(formatted);
       setIsOpen(false);
@@ -137,14 +165,28 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
     days.push(i);
   }
 
-  const monthName = tempDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  const monthName = tempDate.toLocaleDateString('es-ES', {
+    month: 'long',
+    year: 'numeric',
+  });
   const months = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
   ];
 
   const yearRange = [];
-  for (let year = 1950; year <= 2050; year++) {
+  // ⭐ Usar maxYear en vez de 2050
+  for (let year = 1950; year <= maxYear; year++) {
     yearRange.push(year);
   }
 
@@ -161,10 +203,7 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
           border-b-2 transition-all duration-300
           focus:outline-none cursor-pointer font-medium
           placeholder-gray-400
-          ${isOpen
-            ? 'border-blue-500'
-            : 'border-gray-300 hover:border-gray-400'
-          }
+          ${isOpen ? 'border-blue-500' : 'border-gray-300 hover:border-gray-400'}
         `}
         readOnly
       />
@@ -179,7 +218,6 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
 
       {isOpen && (
         <div className="absolute top-full mt-3 sm:mt-2 bg-white rounded-2xl sm:rounded-lg shadow-2xl z-50 border border-gray-200 overflow-hidden w-full sm:w-96">
-          
           {view === 'month-year' && (
             <div className="p-4 sm:p-4">
               <h3 className="text-lg sm:text-base font-bold text-gray-900 mb-4">
@@ -197,9 +235,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                     }}
                     className={`
                       p-2 rounded-lg font-bold text-sm transition-all duration-200
-                      ${selectedYear === year
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'text-gray-700 hover:bg-blue-100 active:bg-blue-200'
+                      ${
+                        selectedYear === year
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:bg-blue-100 active:bg-blue-200'
                       }
                     `}
                   >
@@ -223,9 +262,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                     }}
                     className={`
                       p-2 rounded-lg font-bold text-sm transition-all duration-200
-                      ${selectedMonth === index
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'text-gray-700 hover:bg-blue-100 active:bg-blue-200'
+                      ${
+                        selectedMonth === index
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:bg-blue-100 active:bg-blue-200'
                       }
                     `}
                   >
@@ -264,7 +304,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
 
               <div className="grid grid-cols-7 gap-2 sm:gap-1 mb-4 sm:mb-3">
                 {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((day) => (
-                  <div key={day} className="text-center text-sm sm:text-xs font-bold text-gray-600 h-10 sm:h-8 flex items-center justify-center">
+                  <div
+                    key={day}
+                    className="text-center text-sm sm:text-xs font-bold text-gray-600 h-10 sm:h-8 flex items-center justify-center"
+                  >
                     {day}
                   </div>
                 ))}
@@ -282,13 +325,14 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                     disabled={!day}
                     className={`
                       h-10 sm:h-7 rounded-lg sm:rounded text-sm sm:text-xs font-semibold transition-all duration-200
-                      ${!day
-                        ? 'invisible'
-                        : selectedDate?.getDate() === day &&
-                          selectedDate?.getMonth() === selectedMonth &&
-                          selectedDate?.getFullYear() === selectedYear
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'text-gray-700 hover:bg-blue-100 active:bg-blue-200'
+                      ${
+                        !day
+                          ? 'invisible'
+                          : selectedDate?.getDate() === day &&
+                            selectedDate?.getMonth() === selectedMonth &&
+                            selectedDate?.getFullYear() === selectedYear
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:bg-blue-100 active:bg-blue-200'
                       }
                     `}
                   >
@@ -330,7 +374,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                       onClick={() => setHours(Math.max(0, hours - 1))}
                       className="p-2 hover:bg-gray-200 rounded-lg active:bg-gray-300 transition-colors"
                     >
-                      <ChevronLeft size={20} className="sm:w-4 sm:h-4 text-gray-700" />
+                      <ChevronLeft
+                        size={20}
+                        className="sm:w-4 sm:h-4 text-gray-700"
+                      />
                     </button>
                     <input
                       type="number"
@@ -350,12 +397,17 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                       onClick={() => setHours(Math.min(23, hours + 1))}
                       className="p-2 hover:bg-gray-200 rounded-lg active:bg-gray-300 transition-colors"
                     >
-                      <ChevronRight size={20} className="sm:w-4 sm:h-4 text-gray-700" />
+                      <ChevronRight
+                        size={20}
+                        className="sm:w-4 sm:h-4 text-gray-700"
+                      />
                     </button>
                   </div>
                 </div>
 
-                <div className="text-4xl sm:text-3xl font-bold text-gray-400 h-20 sm:h-16 flex items-center">:</div>
+                <div className="text-4xl sm:text-3xl font-bold text-gray-400 h-20 sm:h-16 flex items-center">
+                  :
+                </div>
 
                 <div className="flex flex-col items-center">
                   <label className="text-sm sm:text-xs font-bold text-gray-700 mb-2">
@@ -367,7 +419,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                       onClick={() => setMinutes(Math.max(0, minutes - 5))}
                       className="p-2 hover:bg-gray-200 rounded-lg active:bg-gray-300 transition-colors"
                     >
-                      <ChevronLeft size={20} className="sm:w-4 sm:h-4 text-gray-700" />
+                      <ChevronLeft
+                        size={20}
+                        className="sm:w-4 sm:h-4 text-gray-700"
+                      />
                     </button>
                     <input
                       type="number"
@@ -387,7 +442,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy' }) => {
                       onClick={() => setMinutes(Math.min(59, minutes + 5))}
                       className="p-2 hover:bg-gray-200 rounded-lg active:bg-gray-300 transition-colors"
                     >
-                      <ChevronRight size={20} className="sm:w-4 sm:h-4 text-gray-700" />
+                      <ChevronRight
+                        size={20}
+                        className="sm:w-4 sm:h-4 text-gray-700"
+                      />
                     </button>
                   </div>
                 </div>

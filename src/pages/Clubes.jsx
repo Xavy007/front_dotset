@@ -1,12 +1,12 @@
 // ===============================================
 // ARCHIVO: src/pages/ClubesPage.jsx
-// PÁGINA DE GESTIÓN DE CLUBES - CRUD COMPLETO
+// PÁGINA DE GESTIÓN DE CLUBES CON SUBIDA DE ARCHIVOS
 // ===============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, Plus, Search, AlertCircle,
-  Pencil, Globe, Mail, Phone, Power, Trash2, Shield
+  Pencil, Globe, Mail, Phone, Power, Trash2, Shield, X
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
@@ -18,12 +18,15 @@ export function ClubesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null); // ← Para preview de imagen
 
   const API_URL = 'http://localhost:8080/api/club';
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
-    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+    return { 
+      'Authorization': `Bearer ${token}`
+    };
   };
 
   // ===============================================
@@ -37,7 +40,9 @@ export function ClubesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(API_URL, { headers: getAuthHeaders() });
+      const res = await fetch(API_URL, { 
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } 
+      });
       if (!res.ok) throw new Error('Error al cargar clubes');
       const data = await res.json();
       const arr = Array.isArray(data) ? data : data.data || [];
@@ -55,6 +60,18 @@ export function ClubesPage() {
   // ===============================================
   const normalizarClub = (c) => {
     const estadoBooleano = c.estado === true || c.estado === 1;
+    
+    let redesParsed = {};
+    if (c.redes_sociales) {
+      try {
+        redesParsed = typeof c.redes_sociales === 'string' 
+          ? JSON.parse(c.redes_sociales) 
+          : c.redes_sociales;
+      } catch (e) {
+        redesParsed = {};
+      }
+    }
+
     return {
       ...c,
       id_club: c.id_club ?? c.id,
@@ -63,7 +80,12 @@ export function ClubesPage() {
       direccion: c.direccion ?? '',
       telefono: c.telefono ?? '',
       email: c.email ?? '',
-      redes_sociales: c.redes_sociales ?? '',
+      facebook: redesParsed.facebook || '',
+      instagram: redesParsed.instagram || '',
+      whatsapp: redesParsed.whatsapp || '',
+      tiktok: redesParsed.tiktok || '',
+      twitter: redesParsed.twitter || '',
+      youtube: redesParsed.youtube || '',
       personeria: c.personeria ?? false,
       estadoBooleano,
       estadoVista: estadoBooleano ? 'activo' : 'inactivo',
@@ -73,43 +95,111 @@ export function ClubesPage() {
   };
 
   // ===============================================
-  // CREAR / EDITAR CLUB
+  // MANEJAR ARCHIVO (useCallback para evitar re-renders)
+  // ===============================================
+  const handleFileChange = useCallback((file) => {
+    console.log('📷 ClubesPage - Archivo recibido:', file?.name);
+    
+    if (file instanceof File) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result);
+        console.log('🖼️ Preview generado');
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const clearPreview = useCallback(() => {
+    setPreviewUrl(null);
+    console.log('🗑️ Preview limpiado');
+  }, []);
+
+  // ===============================================
+  // CREAR / EDITAR CLUB CON FORMDATA
   // ===============================================
   const handleSubmit = async (formData) => {
     try {
-      const body = {
-        nombre: formData.nombre,
-        acronimo: formData.acronimo || null,
-        direccion: formData.direccion || null,
-        logo: formData.logo || null,
-        telefono: formData.telefono || null,
-        email: formData.email || null,
-        redes_sociales: formData.redes_sociales || null,
-        personeria: formData.personeria === 'true' || formData.personeria === true,
-        estado: formData.estado === 'true' || formData.estado === true,
+      console.log('📨 FormData recibido:', formData);
+
+      // Construir objeto de redes sociales
+      const redesSociales = {
+        facebook: formData.facebook || '',
+        instagram: formData.instagram || '',
+        whatsapp: formData.whatsapp || '',
+        tiktok: formData.tiktok || '',
+        twitter: formData.twitter || '',
+        youtube: formData.youtube || '',
       };
+
+      // Crear FormData para enviar archivo
+      const formDataToSend = new FormData();
+      formDataToSend.append('nombre', formData.nombre || '');
+      formDataToSend.append('acronimo', formData.acronimo || '');
+      formDataToSend.append('direccion', formData.direccion || '');
+      formDataToSend.append('telefono', formData.telefono || '');
+      formDataToSend.append('email', formData.email || '');
+      formDataToSend.append('redes_sociales', JSON.stringify(redesSociales));
+      formDataToSend.append('personeria', formData.personeria === 'true' || formData.personeria === true);
+      
+      // Estado: Si es edición, mantener el actual; si es nuevo, activo por defecto
+      const estadoValue = editingClub 
+        ? (editingClub.estadoBooleano !== undefined ? editingClub.estadoBooleano : true)
+        : true;
+      formDataToSend.append('estado', estadoValue);
+      console.log('📊 Estado enviado:', estadoValue);
+
+      // 📷 Agregar archivo solo si existe en formData.logo
+      if (formData.logo instanceof File) {
+        formDataToSend.append('logo', formData.logo);
+        console.log('📷 Enviando archivo nuevo:', formData.logo.name);
+      } else if (editingClub && editingClub.logo) {
+        formDataToSend.append('logoExistente', editingClub.logo);
+        console.log('📷 Manteniendo logo existente:', editingClub.logo);
+      }
+
+      // Debug: Ver qué hay en FormData
+      console.log('📦 FormData entries:');
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`  ${key}:`, value instanceof File ? `[File: ${value.name}]` : value);
+      }
 
       const method = editingClub ? 'PUT' : 'POST';
       const url = editingClub ? `${API_URL}/${editingClub.id_club}` : API_URL;
 
+      console.log(`📡 Enviando ${method} a: ${url}`);
+
       const res = await fetch(url, {
         method,
         headers: getAuthHeaders(),
-        body: JSON.stringify(body)
+        body: formDataToSend
       });
 
+      console.log('📡 Response status:', res.status);
+
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Error al guardar el club');
+        let errorMessage = 'Error al guardar el club';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorMessage;
+          console.error('❌ Error del servidor:', errorData);
+        } catch (parseError) {
+          console.error('❌ Error al parsear respuesta de error');
+        }
+        throw new Error(errorMessage);
       }
+
+      const resultado = await res.json();
+      console.log('✅ Club guardado exitosamente:', resultado);
 
       await fetchClubes();
       setIsModalOpen(false);
       setEditingClub(null);
+      setPreviewUrl(null);
       alert('Club guardado correctamente');
     } catch (err) {
-      console.error(err);
-      alert(err.message);
+      console.error('❌ Error completo:', err);
+      alert(`Error: ${err.message}`);
     }
   };
 
@@ -123,9 +213,13 @@ export function ClubesPage() {
     try {
       const res = await fetch(`${API_URL}/${club.id_club}/estado`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ estado: nuevoEstado })
       });
+      
       if (!res.ok) throw new Error('Error al cambiar el estado');
 
       setClubes(prev =>
@@ -135,6 +229,8 @@ export function ClubesPage() {
             : c
         )
       );
+      
+      alert(`Club ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`);
     } catch (err) {
       console.error(err);
       alert(err.message);
@@ -193,16 +289,41 @@ export function ClubesPage() {
   // COLUMNAS DE TABLA
   // ===============================================
   const columns = [
-    {
-      key: 'logo',
-      label: 'Logo',
-      render: (value) =>
-        value ? (
-          <img src={value} alt="logo" className="w-10 h-10 object-cover rounded-full" />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">🏐</div>
-        )
-    },
+{
+  key: 'logo',
+  label: 'Logo',
+  render: (value) => {
+    console.log('🖼️ Logo value:', value); // ← AGREGAR para debug
+    
+    if (!value) {
+      return (
+        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+          🏐
+        </div>
+      );
+    }
+    
+    // Construir URL correcta
+    const imageUrl = value.startsWith('http') 
+      ? value 
+      : `http://localhost:8080${value.startsWith('/') ? value : '/' + value}`;
+    
+    console.log('🖼️ Image URL:', imageUrl); // ← AGREGAR para debug
+    
+    return (
+      <img 
+        src={imageUrl}
+        alt="logo club" 
+        className="w-10 h-10 object-cover rounded-full border"
+        onError={(e) => {
+          console.error('❌ Error cargando imagen:', imageUrl);
+          e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect fill="%23ddd" width="40" height="40"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">🏐</text></svg>';
+        }}
+      />
+    );
+  }
+}
+,
     { key: 'nombre', label: 'Nombre', render: (v) => <div className="font-bold text-gray-900">{v}</div> },
     { key: 'acronimo', label: 'Sigla', render: (v) => <div>{v || '—'}</div> },
     { key: 'telefono', label: 'Teléfono', render: (v) => <div>{v || '—'}</div> },
@@ -233,7 +354,11 @@ export function ClubesPage() {
       label: 'Acciones',
       render: (_v, row) => (
         <div className="flex items-center gap-2">
-          <IconBtn title="Editar" onClick={() => { setEditingClub(row); setIsModalOpen(true); }}>
+          <IconBtn title="Editar" onClick={() => { 
+            setEditingClub(row); 
+            setPreviewUrl(null);
+            setIsModalOpen(true); 
+          }}>
             <Pencil size={18} />
           </IconBtn>
           <IconBtn
@@ -251,34 +376,132 @@ export function ClubesPage() {
   ];
 
   // ===============================================
-  // CAMPOS DEL FORMULARIO
+  // CAMPOS DEL FORMULARIO (MEMOIZADOS con useCallback)
   // ===============================================
   const formFields = [
-    { name: 'nombre', label: 'Nombre del Club', type: 'text', required: true },
-    { name: 'acronimo', label: 'Acrónimo', type: 'text', required: false },
-    { name: 'direccion', label: 'Dirección', type: 'text', required: false },
-    { name: 'telefono', label: 'Teléfono', type: 'text', required: false },
-    { name: 'email', label: 'Correo Electrónico', type: 'email', required: false },
-    { name: 'logo', label: 'Logo (URL)', type: 'text', required: false },
-    { name: 'redes_sociales', label: 'Redes Sociales (URL o nombre)', type: 'text', required: false },
+    { 
+      name: 'nombre', 
+      label: 'Nombre del Club', 
+      type: 'text', 
+      required: true,
+      cols: 2,
+    },
+    { 
+      name: 'acronimo', 
+      label: 'Acrónimo', 
+      type: 'text', 
+      required: false,
+      cols: 1,
+    },
+    { 
+      name: 'direccion', 
+      label: 'Dirección', 
+      type: 'text', 
+      required: false,
+      cols: 3,
+    },
+    { 
+      name: 'telefono', 
+      label: 'Teléfono', 
+      type: 'text', 
+      required: false,
+      cols: 2,
+    },
+    { 
+      name: 'email', 
+      label: 'Correo Electrónico', 
+      type: 'email', 
+      required: false,
+      cols: 1,
+    },
+    { 
+      name: 'logo', 
+      label: 'Logo del Club', 
+      type: 'file', 
+      required: false,
+      accept: 'image/*',
+      onChange: handleFileChange, // ← useCallback
+      cols: 3,
+      helperText: 'Sube una imagen (JPG, PNG, etc.) - Máximo 5MB',
+      renderCustom: () => (
+        previewUrl && (
+          <div className="mt-4 relative inline-block">
+            <img 
+              src={previewUrl} 
+              alt="Preview logo" 
+              className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300 shadow-sm"
+            />
+            <button
+              type="button"
+              onClick={clearPreview}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+              title="Eliminar imagen"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )
+      )
+    },
+    
+    { 
+      name: 'facebook', 
+      label: '📘 Facebook', 
+      type: 'text', 
+      required: false,
+      placeholder: 'https://facebook.com/club',
+      cols: 1,
+    },
+    { 
+      name: 'instagram', 
+      label: '📷 Instagram', 
+      type: 'text', 
+      required: false,
+      placeholder: '@nombreclub',
+      cols: 1,
+    },
+    { 
+      name: 'whatsapp', 
+      label: '💬 WhatsApp', 
+      type: 'text', 
+      required: false,
+      placeholder: '+591 XXXXXXXX',
+      cols: 1,
+    },
+    { 
+      name: 'tiktok', 
+      label: '🎵 TikTok', 
+      type: 'text', 
+      required: false,
+      placeholder: '@nombreclub',
+      cols: 1,
+    },
+    { 
+      name: 'twitter', 
+      label: '🐦 Twitter/X', 
+      type: 'text', 
+      required: false,
+      placeholder: '@nombreclub',
+      cols: 1,
+    },
+    { 
+      name: 'youtube', 
+      label: '📹 YouTube', 
+      type: 'text', 
+      required: false,
+      placeholder: 'https://youtube.com/@canal',
+      cols: 1,
+    },
+    
     {
       name: 'personeria',
       label: '¿Tiene Personería Jurídica?',
       type: 'select',
       required: true,
+      cols: 3,
       options: [
         { label: 'Sí', value: true },
         { label: 'No', value: false },
-      ]
-    },
-    {
-      name: 'estado',
-      label: 'Estado',
-      type: 'select',
-      required: true,
-      options: [
-        { label: 'Activo', value: true },
-        { label: 'Inactivo', value: false },
       ]
     },
   ];
@@ -316,14 +539,17 @@ export function ClubesPage() {
           />
         </div>
         <button
-          onClick={() => { setEditingClub(null); setIsModalOpen(true); }}
+          onClick={() => { 
+            setEditingClub(null); 
+            setPreviewUrl(null);
+            setIsModalOpen(true); 
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           <Plus size={20} /> Nuevo Club
         </button>
       </div>
 
-      {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
           <p className="text-gray-600 text-sm">Total Clubes</p>
@@ -350,9 +576,14 @@ export function ClubesPage() {
 
       <FormModal
         isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingClub(null); }}
+        onClose={() => { 
+          setIsModalOpen(false); 
+          setEditingClub(null); 
+          setPreviewUrl(null);
+        }}
         onSubmit={handleSubmit}
         title={editingClub ? 'Editar Club' : 'Registrar Nuevo Club'}
+        size="4xl"
         fields={formFields}
         initialData={editingClub || {}}
       />

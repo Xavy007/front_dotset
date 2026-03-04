@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import StatsGrid from './components/StatsGrid';
-import ChartSection from './components/ChartSection';
-import RecentActivity from './components/RecentActivity';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
+
+// Importar nuevos componentes del dashboard
+import VoleibolStatsGrid from './components/Voleibolstatsgrid';
+import PartidosDelDia from './components/Partidosdeldia';
+import CampeonatosChart from './components/Campeonatoschart';
 
 // Importar páginas
 import { UsuariosPage } from './pages/Usuario';
@@ -19,6 +21,13 @@ import { PartidosPage } from './pages/Partidos';
 import { ConfiguracionPage } from './pages/ConfiguracionPage';
 import { CategoriasPage } from './pages/Categorias';
 import { GestionesPage } from './pages/Gestiones';
+import GenerarFixture from './pages/GenerarFixture';
+import GestionPartidos from './pages/GestionPartidos';
+import GestionInscripciones from './pages/GestionInscripciones';
+import { PlanillaFIVB } from './pages/PlanillaFIVB'; // Planilla FIVB con carga de MongoDB
+import { TablaPosicionesPage } from './pages/TablaPosiciones';
+
+
 // ================================================
 //         FUNCIÓN PÁGINA: DASHBOARD
 // ================================================
@@ -28,14 +37,23 @@ function DashboardPage() {
     <>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Bienvenido de vuelta! Aquí está el resumen de tu negocio.</p>
+        <p className="text-gray-600 mt-2">Resumen general del sistema de gestión de voleibol</p>
       </div>
-      <StatsGrid />
+
+      {/* Estadísticas principales */}
+      <VoleibolStatsGrid />
+
+      {/* Grid de contenido */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Partidos del día (ocupa 2 columnas) */}
         <div className="lg:col-span-2">
-          <ChartSection />
+          <PartidosDelDia />
         </div>
-        <RecentActivity />
+
+        {/* Estado de campeonatos (ocupa 1 columna) */}
+        <div>
+          <CampeonatosChart />
+        </div>
       </div>
     </>
   );
@@ -47,6 +65,7 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [userName, setUserName] = useState(''); 
   const [userRol, setUserRol] = useState(''); 
+  
   useEffect(() => {
     const raw = localStorage.getItem('usuario');
     const rol = raw ? JSON.parse(raw).rol : null; 
@@ -100,7 +119,17 @@ export default function Dashboard() {
         return <ConfiguracionPage />;
       case 'gestiones':
         return <GestionesPage />;
-        
+      case 'generar-fixture':
+        return <GenerarFixture />;
+      case 'gestion-partidos':
+        return <GestionPartidos />;
+      case 'gestion-inscripciones':
+        return <GestionInscripciones />;
+      case 'planilla':
+        return <PlanillaFIVB />;
+      case 'tabla-posiciones':
+        return <TablaPosicionesPage />;
+
       default:
         return <DashboardPage />;
     }
@@ -115,12 +144,11 @@ export default function Dashboard() {
         onPageChange={setCurrentPage}
         className="lg:w-64 w-16"
         userRol={userRol} 
-                />
+      />
 
       {/* Contenido principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        
         <Header
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

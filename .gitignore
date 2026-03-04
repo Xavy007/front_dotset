@@ -22,3 +22,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Variables de entorno
+.env
+.env.local
+
+# Herramientas locales
+.claude/
+
+# Documentacion interna generada
+*.md
+!README.md
+
+# Archivos "copy" — backups manuales de desarrollo
+*copy*
+*copy.*
+
+# Archivos .txt dentro del codigo fuente (no son codigo)
+src/**/*.txt
+configuraciondepartidos.txt
+
+# Artefacto de Windows (redireccion a NUL)
+nul

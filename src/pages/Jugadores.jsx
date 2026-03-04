@@ -5,10 +5,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, AlertCircle,
-  Pencil, Trash2, CreditCard, Clock, CheckCircle, XCircle, Bell
+  Pencil, Trash2, CreditCard, Clock, CheckCircle, XCircle, Bell, UserPlus, Printer
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import InscripcionParticipacionModal from '../components/InscripcionParticipacionModal';
 
 export function JugadoresPage() {
   const [jugadores, setJugadores] = useState([]);
@@ -39,8 +40,13 @@ export function JugadoresPage() {
   const [jugadorParaCarnet, setJugadorParaCarnet] = useState(null);
   const [accionCarnet, setAccionCarnet] = useState(null); // 'crear' o 'solicitar'
 
+  // ✅ ESTADO PARA MODAL DE INSCRIPCIÓN EN EQUIPOS
+  const [isInscripcionModalOpen, setIsInscripcionModalOpen] = useState(false);
+  const [jugadorParaInscripcion, setJugadorParaInscripcion] = useState(null);
+
 
   const [categorias, setCategorias] = useState([]);
+  const [categoriasCompletas, setCategoriasCompletas] = useState([]); // Guardar datos completos con edad_inicio y edad_limite
   const [catError, setCatError] = useState(null);
 
   const getUsuarioLogueado = () => {
@@ -97,20 +103,86 @@ const fetchCategorias = async () => {
     if (!res.ok) throw new Error('Error al cargar categorías');
     const data = await res.json();
     const arr = pickArrayCategorias(data);
+
+    // Guardar categorías completas con todos los datos
+    setCategoriasCompletas(arr);
+
+    // Opciones para select (todas las categorías)
     const opts = arr.map((c) => ({
       label: c.nombre ?? `Categoría #${c.id_categoria ?? c.id}`,
       value: String(c.id_categoria ?? c.id),
+      edad_inicio: c.edad_inicio,
+      edad_limite: c.edad_limite,
+      color: c.color || '#3B82F6', // Color HEX de la categoría (default azul)
     }));
     setCategorias(opts);
   } catch (e) {
     console.error('❌ Error fetchCategorias:', e);
     setCatError(e.message);
     setCategorias([]);
+    setCategoriasCompletas([]);
   }
 };
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+  };
+
+  // ✅ Función para calcular edad del jugador
+  const calcularEdad = (fechaNacimiento) => {
+    if (!fechaNacimiento) return null;
+    const hoy = new Date();
+    const nacimiento = new Date(fechaNacimiento);
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const mes = hoy.getMonth() - nacimiento.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+      edad--;
+    }
+    return edad;
+  };
+
+  // ✅ Función para obtener categorías elegibles según edad del jugador
+  const obtenerCategoriasElegibles = (jugador) => {
+    const edad = calcularEdad(jugador.fnac || jugador.persona?.fnac);
+
+    if (edad === null || categorias.length === 0) {
+      console.warn('⚠️ No se pudo calcular edad o no hay categorías disponibles');
+      return categorias; // Devolver todas si no se puede calcular
+    }
+
+    console.log(`📅 Edad del jugador: ${edad} años`);
+
+    // Ordenar categorías por edad_inicio ascendente
+    const categoriasOrdenadas = [...categorias].sort((a, b) =>
+      (a.edad_inicio || 0) - (b.edad_inicio || 0)
+    );
+
+    // Encontrar la categoría natural del jugador (donde su edad está dentro del rango)
+    const indiceCategoriaBase = categoriasOrdenadas.findIndex(cat => {
+      const edadInicio = cat.edad_inicio || 0;
+      const edadLimite = cat.edad_limite || 999;
+      return edad >= edadInicio && edad <= edadLimite;
+    });
+
+    if (indiceCategoriaBase === -1) {
+      console.warn('⚠️ No se encontró categoría base para edad', edad);
+      return categorias; // Devolver todas si no hay categoría base
+    }
+
+    const categoriaBase = categoriasOrdenadas[indiceCategoriaBase];
+    console.log(`✅ Categoría base: ${categoriaBase.label} (${categoriaBase.edad_inicio}-${categoriaBase.edad_limite} años)`);
+
+    // Incluir categoría base + hasta 3 categorías superiores
+    const categoriasElegibles = categoriasOrdenadas.slice(
+      indiceCategoriaBase,
+      indiceCategoriaBase + 4 // Base + 3 superiores = 4 categorías
+    );
+
+    console.log(`📋 Categorías elegibles (${categoriasElegibles.length}):`,
+      categoriasElegibles.map(c => c.label).join(', ')
+    );
+
+    return categoriasElegibles;
   };
 
   const pickArray = (data) => {
@@ -380,7 +452,9 @@ const fetchCategorias = async () => {
       });
       if (!res.ok) return;
       const data = await res.json();
+      console.log('📋 Respuesta de carnets pendientes:', data);
       const arr = pickArrayCarnets(data);
+      console.log('📋 Carnets pendientes procesados:', arr);
       setCarnetsPendientes(arr);
     } catch (e) {
       console.error('Error fetchCarnetsPendientes:', e);
@@ -422,22 +496,50 @@ const fetchCategorias = async () => {
 
   // ✅ NUEVA FUNCIÓN: Procesar creación de carnet
   const procesarCrearCarnet = async (formData) => {
+    alert('🎯 PROCESANDO CARNET - VER CONSOLA');
+    console.log('🎯 procesarCrearCarnet iniciado');
+    console.log('📋 formData completo:', formData);
+    console.log('📷 formData.foto_carnet:', formData.foto_carnet);
     console.log(usuario)
     try {
       const bodyCarnet = {
         id_jugador: Number(jugadorParaCarnet.id_jugador || jugadorParaCarnet.id),
         id_gestion: Number(formData.id_gestion),
-        id_categoria: formData.id_categoria ? Number(formData.id_categoria) : null, // 👈 NUEVO
+        id_categoria: formData.id_categoria ? Number(formData.id_categoria) : null,
+        numero_dorsal: formData.numero_dorsal ? Number(formData.numero_dorsal) : null,
+        posicion: formData.posicion || null,
         solicitado_por: usuarioId,
-        estado_carnet: 'activo',
+        estado_carnet: 'pendiente',
         duracion_dias: 365,
         observaciones: formData.observaciones || `Carnet creado por ${usuario.email || 'administrador'}`
       };
 
-      const res = await fetch(API_URL_CARNET, {
+      // ✅ SIEMPRE usar FormData (con o sin foto)
+      let body = new FormData();
+      let headers = { ...getAuthHeaders() };
+
+      // Agregar todos los campos del carnet
+      Object.keys(bodyCarnet).forEach(key => {
+        if (bodyCarnet[key] !== null && bodyCarnet[key] !== undefined) {
+          body.append(key, bodyCarnet[key]);
+        }
+      });
+
+      // Agregar foto si existe
+      if (formData.foto_carnet) {
+        console.log('📷 Agregando foto:', formData.foto_carnet.name);
+        body.append('foto', formData.foto_carnet);
+      } else {
+        console.log('⚠️ No hay foto en formData');
+      }
+
+      // Remover Content-Type para que el navegador lo configure automáticamente con boundary
+      delete headers['Content-Type'];
+
+      const res = await fetch(`${API_URL_CARNET}/solicitar`, {
         method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(bodyCarnet)
+        headers: headers,
+        body: body
       });
 
       if (!res.ok) {
@@ -447,7 +549,7 @@ const fetchCategorias = async () => {
 
       setIsGestionModalOpen(false);
       setJugadorParaCarnet(null);
-      alert('✅ Carnet creado y activado correctamente');
+      alert('✅ Carnet creado. Ahora puedes revisarlo y activarlo.');
       await fetchJugadores();
     } catch (err) {
       alert('Error: ' + err.message);
@@ -499,6 +601,19 @@ const fetchCategorias = async () => {
     } catch (err) {
       alert('Error: ' + err.message);
     }
+  };
+
+  // ✅ NUEVA FUNCIÓN: Abrir modal de inscripción en equipos
+  const handleInscribirEnEquipo = (jugador) => {
+    console.log('📝 Abriendo modal de inscripción para:', jugador);
+    setJugadorParaInscripcion(jugador);
+    setIsInscripcionModalOpen(true);
+  };
+
+  // ✅ NUEVA FUNCIÓN: Callback después de inscribir exitosamente
+  const handleInscripcionSuccess = async () => {
+    console.log('✅ Inscripción exitosa, recargando jugadores...');
+    await fetchJugadores();
   };
 
   const handleCreateJugador = async (formData) => {
@@ -576,16 +691,30 @@ const fetchCategorias = async () => {
         throw new Error(errorData.message || 'Error al actualizar datos personales');
       }
 
-      const bodyJugador = {
+      // Preparar FormData para el jugador (igual que en clubes - siempre FormData)
+      const formDataJugador = new FormData();
+      formDataJugador.append('datosPersona', JSON.stringify(bodyPersona));
+      formDataJugador.append('datosJugador', JSON.stringify({
         estatura: formData.estatura ? Number(formData.estatura) : 0,
         id_club: formData.id_club ? Number(formData.id_club) : editingJugador.id_club,
-        foto: formData.foto || editingJugador.foto || null,
-      };
+      }));
+
+      // Agregar foto si existe (igual que clubes)
+      if (formData.foto instanceof File) {
+        formDataJugador.append('foto', formData.foto);
+        console.log('📷 Enviando con foto nueva:', formData.foto.name);
+      } else if (editingJugador.foto) {
+        console.log('📷 Manteniendo foto existente:', editingJugador.foto);
+      }
+
+      // Preparar headers sin Content-Type para FormData (igual que clubes)
+      const headersJugador = getAuthHeaders();
+      delete headersJugador['Content-Type']; // Dejar que el navegador configure multipart/form-data
 
       const resJ = await fetch(`${API_URL_JUGADOR}/${editingJugador.id_jugador}`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(bodyJugador)
+        headers: headersJugador,
+        body: formDataJugador
       });
 
       if (!resJ.ok) {
@@ -756,7 +885,7 @@ const fetchCategorias = async () => {
                 <button
                   onClick={() => handleCrearCarnet(row)}
                   className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors flex items-center gap-1.5 shadow-sm"
-                  title="Crear y activar carnet"
+                  title="Crear carnet pendiente de revisión"
                 >
                   <CreditCard size={14} />
                   Crear
@@ -776,9 +905,34 @@ const fetchCategorias = async () => {
 
               {puedeAprobar && (
                 <button
-                  onClick={() => {
-                    setSelectedCarnet(row.carnet);
-                    setIsCarnetModalOpen(true);
+                  onClick={async () => {
+                    try {
+                      // Obtener el carnet completo del backend
+                      const carnetId = row.carnet.id_carnet || row.carnet.id;
+                      console.log('🔍 Consultando carnet ID:', carnetId);
+
+                      const res = await fetch(`${API_URL_CARNET}/${carnetId}`, {
+                        method: 'GET',
+                        headers: getAuthHeaders()
+                      });
+
+                      if (res.ok) {
+                        const data = await res.json();
+                        console.log('✅ Carnet obtenido del backend:', data);
+                        const carnetCompleto = data.data || data.carnet || data;
+                        console.log('📷 Foto carnet en objeto:', carnetCompleto.foto_carnet);
+                        setSelectedCarnet(carnetCompleto);
+                      } else {
+                        console.error('❌ Error al obtener carnet');
+                        setSelectedCarnet(row.carnet);
+                      }
+
+                      setIsCarnetModalOpen(true);
+                    } catch (error) {
+                      console.error('❌ Error:', error);
+                      setSelectedCarnet(row.carnet);
+                      setIsCarnetModalOpen(true);
+                    }
                   }}
                   className="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-md hover:bg-amber-700 transition-colors flex items-center gap-1.5 shadow-sm"
                   title="Revisar solicitud"
@@ -789,10 +943,42 @@ const fetchCategorias = async () => {
               )}
 
               {estado === 'activo' && (
-                <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                  <CheckCircle size={14} />
-                  Habilitado
-                </span>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Obtener el carnet completo del backend
+                      const carnetId = row.carnet.id_carnet || row.carnet.id;
+                      console.log('🔍 Consultando carnet ID:', carnetId);
+
+                      const res = await fetch(`${API_URL_CARNET}/${carnetId}`, {
+                        method: 'GET',
+                        headers: getAuthHeaders()
+                      });
+
+                      if (res.ok) {
+                        const data = await res.json();
+                        console.log('✅ Carnet obtenido del backend:', data);
+                        const carnetCompleto = data.data || data.carnet || data;
+                        console.log('📷 Foto carnet en objeto:', carnetCompleto.foto_carnet);
+                        setSelectedCarnet(carnetCompleto);
+                      } else {
+                        console.error('❌ Error al obtener carnet');
+                        setSelectedCarnet(row.carnet);
+                      }
+
+                      setIsCarnetModalOpen(true);
+                    } catch (error) {
+                      console.error('❌ Error:', error);
+                      setSelectedCarnet(row.carnet);
+                      setIsCarnetModalOpen(true);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                  title="Ver e imprimir carnet"
+                >
+                  <CreditCard size={14} />
+                  Ver Carnet
+                </button>
               )}
 
               {estado === 'vencido' && (
@@ -827,9 +1013,9 @@ const fetchCategorias = async () => {
               <Pencil size={18} />
             </IconBtn>
 
-            <IconBtn 
-              title="Eliminar Jugador" 
-              onClick={() => handleDelete(row.id_jugador ?? row.id)} 
+            <IconBtn
+              title="Eliminar Jugador"
+              onClick={() => handleDelete(row.id_jugador ?? row.id)}
               danger
             >
               <Trash2 size={18} />
@@ -923,10 +1109,11 @@ const fetchCategorias = async () => {
       {
         name: 'foto',
         label: 'Foto del Jugador',
-        type: 'image',
+        type: 'file',
         accept: 'image/*',
         required: false,
         cols: 2,
+        helperText: 'Formatos: JPG, PNG, GIF o WEBP (máx. 5MB)',
       },
     ];
 
@@ -947,6 +1134,25 @@ const fetchCategorias = async () => {
 
   // ✅ NUEVA FUNCIÓN: Campos para modal de gestión
   const getGestionFields = () => {
+    // Debug: ver datos del jugador
+    if (jugadorParaCarnet) {
+      console.log('🔍 Jugador para carnet:', jugadorParaCarnet);
+      console.log('📅 Fecha nacimiento (fnac):', jugadorParaCarnet.fnac);
+      console.log('📅 Fecha nacimiento (persona.fnac):', jugadorParaCarnet.persona?.fnac);
+    }
+
+    // Obtener categorías elegibles para el jugador seleccionado
+    const categoriasElegibles = jugadorParaCarnet
+      ? obtenerCategoriasElegibles(jugadorParaCarnet)
+      : categorias;
+
+    const edad = jugadorParaCarnet
+      ? calcularEdad(jugadorParaCarnet.fnac || jugadorParaCarnet.persona?.fnac)
+      : null;
+
+    console.log('✅ Edad calculada:', edad);
+    console.log('✅ Categorías elegibles:', categoriasElegibles.length);
+
     return [
       {
         name: 'id_gestion',
@@ -957,15 +1163,47 @@ const fetchCategorias = async () => {
         cols: 12,
         options: gestiones,
       },
-       {
-      name: 'id_categoria',
-      label: 'Categoría del carnet',
-      type: 'select',
-      required: true,
-      placeholder: 'Seleccione una categoría',
-      cols: 6,
-      options: categorias,     // 👈 categorías solo para el carnet
-    },
+      {
+        name: 'id_categoria',
+        label: edad
+          ? `Categoría del carnet (Edad: ${edad} años)`
+          : 'Categoría del carnet',
+        type: 'select',
+        required: true,
+        placeholder: 'Seleccione una categoría',
+        cols: 12,
+        options: categoriasElegibles, // ✅ Ahora usa solo las categorías elegibles
+        helperText: categoriasElegibles.length < categorias.length
+          ? `✅ Se muestran ${categoriasElegibles.length} categorías elegibles: categoría base + hasta 3 superiores según edad del jugador`
+          : null,
+      },
+      {
+        name: 'numero_dorsal',
+        label: 'Número de Dorsal',
+        type: 'number',
+        required: false,
+        placeholder: 'Ej: 10',
+        min: 1,
+        max: 99,
+        cols: 6,
+      },
+      {
+        name: 'posicion',
+        label: 'Posición',
+        type: 'text',
+        required: false,
+        placeholder: 'Ej: Líbero, Colocador, etc.',
+        cols: 6,
+      },
+      {
+        name: 'foto_carnet',
+        label: 'Foto del Carnet (opcional)',
+        type: 'file',
+        accept: 'image/*',
+        required: false,
+        cols: 12,
+        helperText: 'Suba una foto tipo carnet del jugador (fondo blanco recomendado, máx. 5MB)',
+      },
       {
         name: 'observaciones',
         label: 'Observaciones (opcional)',
@@ -1214,66 +1452,550 @@ const fetchCategorias = async () => {
       )}
 
       {/* Modal de gestión de carnets */}
-      {isCarnetModalOpen && selectedCarnet && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Gestionar Solicitud de Carnet
-            </h3>
-            
-            <div className="space-y-3 mb-6">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Jugador:</span>
-                <span className="font-medium">
-                  {selectedCarnet.jugador?.Persona?.nombre || 'N/A'} {selectedCarnet.jugador?.Persona?.ap || ''}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Nº Carnet:</span>
-                <span className="font-medium">{selectedCarnet.numero_carnet}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Fecha Solicitud:</span>
-                <span className="font-medium">
-                  {new Date(selectedCarnet.fecha_solicitud).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Estado:</span>
-                <EstadoCarnetBadge estado={selectedCarnet.estado_carnet} />
-              </div>
-              {selectedCarnet.observaciones && (
-                <div>
-                  <span className="text-gray-600 block mb-1">Observaciones:</span>
-                  <p className="text-sm bg-gray-50 p-2 rounded">{selectedCarnet.observaciones}</p>
+      {isCarnetModalOpen && selectedCarnet && (() => {
+        // Debug: Ver qué datos tenemos
+        console.log('🔍 selectedCarnet completo:', selectedCarnet);
+        console.log('🔍 selectedCarnet.jugador:', selectedCarnet.jugador);
+        console.log('🔍 selectedCarnet.id_jugador:', selectedCarnet.id_jugador);
+
+        // Obtener información del jugador y persona
+        const jugadorData = selectedCarnet.jugador || {};
+        const personaData = jugadorData.Persona || {};
+
+        console.log('🔍 jugadorData:', jugadorData);
+        console.log('🔍 personaData:', personaData);
+
+        const nombreCompleto = personaData.nombre
+          ? `${personaData.nombre} ${personaData.ap || ''} ${personaData.am || ''}`.trim()
+          : 'N/A';
+
+        // Obtener club del jugador desde los datos del carnet
+        const clubNombre = jugadorData.Club?.nombre || jugadorData.club?.nombre || null;
+
+        console.log('🔍 jugadorData.Club:', jugadorData.Club);
+        console.log('🔍 clubNombre:', clubNombre);
+
+        // Obtener categoría
+        const categoriaData = selectedCarnet.id_categoria
+          ? categorias.find(c => String(c.value) === String(selectedCarnet.id_categoria))
+          : null;
+
+        console.log('🔍 categoriaData:', categoriaData);
+        console.log('🔍 selectedCarnet.id_categoria:', selectedCarnet.id_categoria);
+
+        // Obtener el color de la categoría (default azul si no hay)
+        const categoriaColor = categoriaData?.color || '#3B82F6';
+
+        // Función para oscurecer un color HEX
+        const darkenColor = (hex, percent) => {
+          const num = parseInt(hex.replace('#', ''), 16);
+          const r = Math.max(0, Math.floor((num >> 16) * (1 - percent)));
+          const g = Math.max(0, Math.floor(((num >> 8) & 0x00FF) * (1 - percent)));
+          const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - percent)));
+          return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+        };
+
+        // Función para aclarar un color HEX
+        const lightenColor = (hex, percent) => {
+          const num = parseInt(hex.replace('#', ''), 16);
+          const r = Math.min(255, Math.floor((num >> 16) + (255 - (num >> 16)) * percent));
+          const g = Math.min(255, Math.floor(((num >> 8) & 0x00FF) + (255 - ((num >> 8) & 0x00FF)) * percent));
+          const b = Math.min(255, Math.floor((num & 0x0000FF) + (255 - (num & 0x0000FF)) * percent));
+          return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+        };
+
+        const colorBase = categoriaColor;
+        const colorOscuro = darkenColor(categoriaColor, 0.3);
+        const colorMuyOscuro = darkenColor(categoriaColor, 0.5);
+        const colorClaro = lightenColor(categoriaColor, 0.4);
+
+        return (
+          <>
+            {/* Overlay del modal - Oculto en impresión */}
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 print:hidden">
+              <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                {/* Botones del modal (NO se imprimen) */}
+                <div className="flex gap-3 p-6 border-b">
+                  {selectedCarnet.estado_carnet === 'pendiente' ? (
+                    <>
+                      <button
+                        onClick={() => aprobarCarnet(selectedCarnet)}
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                      >
+                        <CheckCircle size={18} />
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => rechazarCarnet(selectedCarnet)}
+                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                      >
+                        <XCircle size={18} />
+                        Rechazar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => window.print()}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                    >
+                      <Printer size={18} />
+                      Imprimir Carnet
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setIsCarnetModalOpen(false); setSelectedCarnet(null); }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Cerrar
+                  </button>
                 </div>
-              )}
+
+                {/* Vista previa del carnet en el modal */}
+                <div className="flex justify-center p-6 bg-gray-100">
+                  <div
+                    className="relative overflow-hidden shadow-2xl"
+                    style={{
+                      width: '700px',
+                      height: '441px',
+                      background: '#FFFFFF',
+                      border: `6px solid ${colorBase}`
+                    }}
+                  >
+                    {/* Barra lateral izquierda con texto VOLEIBOL vertical */}
+                    <div
+                      className="absolute left-0 top-0 bottom-0 flex items-center justify-center"
+                      style={{
+                        width: '50px',
+                        background: colorBase,
+                        borderRight: `3px solid ${colorOscuro}`
+                      }}
+                    >
+                      <p
+                        className="text-white font-black tracking-widest"
+                        style={{
+                          fontSize: '20px',
+                          writingMode: 'vertical-rl',
+                          transform: 'rotate(180deg)',
+                          letterSpacing: '0.15em'
+                        }}
+                      >
+                        VOLEIBOL * CERCADO
+                      </p>
+                    </div>
+
+                    {/* Marca de agua en el fondo */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+                      <p className="text-gray-400 font-black" style={{fontSize: '200px', transform: 'rotate(-15deg)'}}>
+                        FEDERACIÓN
+                      </p>
+                    </div>
+
+                    {/* Header con borde de color de categoría */}
+                    <div
+                      className="relative pt-6 pb-4 text-center"
+                      style={{
+                        marginLeft: '50px',
+                        borderBottom: `5px solid ${colorBase}`
+                      }}
+                    >
+                      <p className="font-bold uppercase" style={{fontSize: '22px', color: '#1a1a1a', letterSpacing: '0.2em'}}>
+                        ASOCIACIÓN MUNICIPAL
+                      </p>
+                      <h1 className="font-black uppercase" style={{fontSize: '32px', color: '#000', letterSpacing: '0.15em'}}>
+                        CARNET DE JUGADOR
+                      </h1>
+                    </div>
+
+                    {/* Contenido principal */}
+                    <div className="relative flex" style={{marginLeft: '50px', padding: '20px 30px', gap: '30px'}}>
+                      {/* Foto del jugador con borde de categoría */}
+                      <div className="flex-shrink-0">
+                        {selectedCarnet.foto_carnet ? (
+                          <div
+                            className="overflow-hidden shadow-xl"
+                            style={{
+                              width: '180px',
+                              height: '220px',
+                              border: `5px solid ${colorBase}`
+                            }}
+                          >
+                            <img
+                              src={`http://localhost:8080${selectedCarnet.foto_carnet}`}
+                              alt="Foto"
+                              style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center justify-center bg-gray-200 shadow-xl"
+                            style={{
+                              width: '180px',
+                              height: '220px',
+                              border: `5px solid ${colorBase}`
+                            }}
+                          >
+                            <span className="text-gray-400" style={{fontSize: '16px'}}>Sin foto</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Información del jugador */}
+                      <div className="flex-1" style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                        {/* Club */}
+                        {clubNombre && (
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>CLUB:</p>
+                            <p className="font-bold leading-tight" style={{fontSize: '20px', color: '#000'}}>{clubNombre}</p>
+                          </div>
+                        )}
+
+                        {/* Categoría con color de fondo */}
+                        {categoriaData && (
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>CATEGORÍA:</p>
+                            <div
+                              className="inline-block px-4 py-1"
+                              style={{
+                                background: colorBase,
+                                borderRadius: '4px'
+                              }}
+                            >
+                              <p className="font-black uppercase text-white" style={{fontSize: '18px'}}>{categoriaData.label}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rama (género) */}
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>RAMA:</p>
+                          <p className="font-bold" style={{fontSize: '18px', color: '#000'}}>
+                            {categoriaData?.label?.includes('Damas') ? 'FEMENINO' : 'MASCULINO'}
+                          </p>
+                        </div>
+
+                        {/* Nombres */}
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>NOMBRES:</p>
+                          <p className="font-bold leading-tight" style={{fontSize: '18px', color: '#000'}}>{nombreCompleto.split(' ')[0]}</p>
+                        </div>
+
+                        {/* Apellidos */}
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>APELLIDOS:</p>
+                          <p className="font-bold leading-tight" style={{fontSize: '18px', color: '#000'}}>
+                            {nombreCompleto.split(' ').slice(1).join(' ')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Datos adicionales en la parte inferior */}
+                    <div
+                      className="absolute bottom-0 left-0 right-0"
+                      style={{
+                        marginLeft: '50px',
+                        padding: '15px 30px',
+                        background: '#f8f8f8',
+                        borderTop: `4px solid ${colorBase}`
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex gap-12">
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000', marginBottom: '4px'}}>F. NACIMTO.</p>
+                            <p className="font-bold" style={{fontSize: '16px', color: '#000'}}>
+                              {new Date(selectedCarnet.fecha_solicitud).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000', marginBottom: '4px'}}>C.I.</p>
+                            <p className="font-bold" style={{fontSize: '16px', color: '#000'}}>{selectedCarnet.numero_carnet}</p>
+                          </div>
+
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000', marginBottom: '4px'}}>GESTIÓN:</p>
+                            <p className="font-bold" style={{fontSize: '16px', color: '#000'}}>
+                              {new Date(selectedCarnet.fecha_vencimiento).getFullYear()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Línea de puntos para firma */}
+                        <div className="text-center">
+                          <div
+                            style={{
+                              borderBottom: '2px dotted #000',
+                              width: '180px',
+                              marginBottom: '6px'
+                            }}
+                          ></div>
+                          <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000'}}>FIRMA JUGADOR</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedCarnet.observaciones && (
+                  <div className="px-6 pb-4">
+                    <span className="text-gray-600 text-sm block mb-2">Observaciones</span>
+                    <p className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
+                      {selectedCarnet.observaciones}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => aprobarCarnet(selectedCarnet)}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+            {/* CARNET FUTURISTA PARA IMPRESIÓN - Solo visible al imprimir */}
+            <div id="carnet-imprimible" className="hidden print:block print:m-0">
+              <style>{`
+                @media print {
+                  * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                  }
+                  body * {
+                    visibility: hidden;
+                  }
+                  #carnet-imprimible, #carnet-imprimible * {
+                    visibility: visible;
+                  }
+                  #carnet-imprimible {
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  }
+                  @page {
+                    size: A4 landscape;
+                    margin: 0;
+                  }
+                }
+              `}</style>
+
+              {/* Diseño del Carnet - Estilo Profesional con fondo claro */}
+              <div
+                className="relative overflow-hidden"
+                style={{
+                  width: '100mm',
+                  height: '63mm',
+                  background: '#FFFFFF',
+                  border: `4px solid ${colorBase}`
+                }}
               >
-                <CheckCircle size={18} />
-                Aprobar
-              </button>
-              <button
-                onClick={() => rechazarCarnet(selectedCarnet)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <XCircle size={18} />
-                Rechazar
-              </button>
-              <button
-                onClick={() => { setIsCarnetModalOpen(false); setSelectedCarnet(null); }}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
+                {/* Barra lateral izquierda con texto VOLEIBOL vertical */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 flex items-center justify-center"
+                  style={{
+                    width: '18px',
+                    background: colorBase,
+                    borderRight: `2px solid ${colorOscuro}`
+                  }}
+                >
+                  <p
+                    className="text-white font-black tracking-widest"
+                    style={{
+                      fontSize: '9px',
+                      writingMode: 'vertical-rl',
+                      transform: 'rotate(180deg)',
+                      letterSpacing: '0.1em'
+                    }}
+                  >
+                    VOLEIBOL * CERCADO
+                  </p>
+                </div>
+
+                {/* Marca de agua en el fondo */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+                  <p className="text-gray-400 font-black" style={{fontSize: '80px', transform: 'rotate(-15deg)'}}>
+                    FEDERACIÓN
+                  </p>
+                </div>
+
+                {/* Header con borde de color de categoría */}
+                <div
+                  className="relative pt-2 pb-2 text-center"
+                  style={{
+                    marginLeft: '18px',
+                    borderBottom: `3px solid ${colorBase}`
+                  }}
+                >
+                  <p className="font-bold uppercase" style={{fontSize: '11px', color: '#1a1a1a', letterSpacing: '0.15em'}}>
+                    ASOCIACIÓN MUNICIPAL
+                  </p>
+                  <h1 className="font-black uppercase" style={{fontSize: '16px', color: '#000', letterSpacing: '0.1em'}}>
+                    CARNET DE JUGADOR
+                  </h1>
+                </div>
+
+                {/* Contenido principal */}
+                <div className="relative flex" style={{marginLeft: '18px', padding: '8px 10px', gap: '10px'}}>
+                  {/* Foto del jugador con borde de categoría */}
+                  <div className="flex-shrink-0">
+                    {selectedCarnet.foto_carnet ? (
+                      <div
+                        className="overflow-hidden"
+                        style={{
+                          width: '70px',
+                          height: '84px',
+                          border: `3px solid ${colorBase}`
+                        }}
+                      >
+                        <img
+                          src={`http://localhost:8080${selectedCarnet.foto_carnet}`}
+                          alt="Foto"
+                          style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center justify-center bg-gray-200"
+                        style={{
+                          width: '70px',
+                          height: '84px',
+                          border: `3px solid ${colorBase}`
+                        }}
+                      >
+                        <span className="text-gray-400" style={{fontSize: '9px'}}>Sin foto</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Información del jugador */}
+                  <div className="flex-1" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    {/* Club */}
+                    {clubNombre && (
+                      <div>
+                        <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>CLUB:</p>
+                        <p className="font-bold leading-tight" style={{fontSize: '11px', color: '#000'}}>{clubNombre}</p>
+                      </div>
+                    )}
+
+                    {/* Categoría con color de fondo */}
+                    {categoriaData && (
+                      <div>
+                        <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>CATEGORÍA:</p>
+                        <div
+                          className="inline-block px-2 py-0.5"
+                          style={{
+                            background: colorBase,
+                            borderRadius: '2px'
+                          }}
+                        >
+                          <p className="font-black uppercase text-white" style={{fontSize: '10px'}}>{categoriaData.label}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rama (género) */}
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>RAMA:</p>
+                      <p className="font-bold" style={{fontSize: '10px', color: '#000'}}>
+                        {categoriaData?.label?.includes('Damas') ? 'FEMENINO' : 'MASCULINO'}
+                      </p>
+                    </div>
+
+                    {/* Nombres */}
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>NOMBRES:</p>
+                      <p className="font-bold leading-tight" style={{fontSize: '10px', color: '#000'}}>{nombreCompleto.split(' ')[0]}</p>
+                    </div>
+
+                    {/* Apellidos */}
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>APELLIDOS:</p>
+                      <p className="font-bold leading-tight" style={{fontSize: '10px', color: '#000'}}>
+                        {nombreCompleto.split(' ').slice(1).join(' ')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Datos adicionales en la parte inferior */}
+                <div
+                  className="absolute bottom-0 left-0 right-0"
+                  style={{
+                    marginLeft: '18px',
+                    padding: '6px 10px',
+                    background: '#f8f8f8',
+                    borderTop: `2px solid ${colorBase}`
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-6">
+                      <div>
+                        <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000', marginBottom: '1px'}}>F. NACIMTO.</p>
+                        <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
+                          {new Date(selectedCarnet.fecha_solicitud).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000', marginBottom: '1px'}}>C.I.</p>
+                        <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>{selectedCarnet.numero_carnet}</p>
+                      </div>
+
+                      <div>
+                        <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000', marginBottom: '1px'}}>GESTIÓN:</p>
+                        <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
+                          {new Date(selectedCarnet.fecha_vencimiento).getFullYear()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Línea de puntos para firma */}
+                    <div className="text-center">
+                      <div
+                        style={{
+                          borderBottom: '1px dotted #000',
+                          width: '80px',
+                          marginBottom: '2px'
+                        }}
+                      ></div>
+                      <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000'}}>FIRMA JUGADOR</p>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedCarnet.observaciones && selectedCarnet.estado_carnet === 'pendiente' && (
+                  <div className="hidden">
+                    <p className="text-xs">{selectedCarnet.observaciones}</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+
+          </>
+        );
+      })()}
+
+
+      {/* ✅ MODAL DE INSCRIPCIÓN EN EQUIPOS */}
+      {jugadorParaInscripcion && (
+        <InscripcionParticipacionModal
+          isOpen={isInscripcionModalOpen}
+          onClose={() => {
+            setIsInscripcionModalOpen(false);
+            setJugadorParaInscripcion(null);
+          }}
+          jugador={{
+            id_jugador: jugadorParaInscripcion.id_jugador,
+            nombre: jugadorParaInscripcion.nombre,
+            ap: jugadorParaInscripcion.ap,
+            am: jugadorParaInscripcion.am,
+            fnac: jugadorParaInscripcion.fnac
+          }}
+          categoriasPermitidas={obtenerCategoriasElegibles(jugadorParaInscripcion)}
+          todasCategorias={categorias}
+          onSuccess={handleInscripcionSuccess}
+        />
       )}
     </div>
   );

@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, Plus, Search, Edit2, Trash2, X, Shuffle } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import ModalCategoriaCampeonato from '../components/ModalCategoriaCampeonato';
+import { campeonatoService } from '../services/campeonatoService';
+import { equipoService } from '../services/equipoService';
+import { categoriaService } from '../services/categoriaService';
 
 // =========== MAPEO DE LOGOS/IMÁGENES DE CLUBES ===========
 const LOGOS_CLUBES = {
@@ -102,58 +106,15 @@ const SelectedTeamCard = ({ equipo, onRemove }) => {
 };
 
 export function CampeonatosPage() {
-  // =========== MAPEO DE EQUIPOS POR CATEGORÍA ===========
-  const equiposPorCategoria = {
-    'Mayor': [
-      'Bolívar', 'Strongest', 'Wilstermann', 'Municipal', 'The Strongest',
-      'San José', 'Oruro Royal', 'Académico', 'Blooming', 'Palmaflor',
-      'Deportivo Chuquisaca', 'Destroyers', 'Guabirá', 'Real Potosí', 'Aurora'
-    ],
-    'Sub-20': [
-      'Bolívar U-20', 'Strongest U-20', 'Wilstermann U-20', 'Municipal U-20',
-      'The Strongest U-20', 'San José U-20', 'Oruro Royal U-20', 'Académico U-20',
-      'Blooming U-20', 'Palmaflor U-20'
-    ],
-    'Sub-17': [
-      'Bolívar U-17', 'Strongest U-17', 'Wilstermann U-17', 'Municipal U-17',
-      'The Strongest U-17', 'San José U-17', 'Oruro Royal U-17', 'Académico U-17',
-      'Blooming U-17', 'Palmaflor U-17'
-    ],
-    'Femenino': [
-      'Bolívar Fem', 'Strongest Fem', 'Wilstermann Fem', 'Municipal Fem',
-      'The Strongest Fem', 'San José Fem', 'Oruro Royal Fem', 'Académico Fem',
-      'Blooming Fem', 'Palmaflor Fem'
-    ],
-    'Infantil': [
-      'Bolívar Infantil', 'Strongest Infantil', 'Wilstermann Infantil',
-      'Municipal Infantil', 'The Strongest Infantil', 'San José Infantil',
-      'Oruro Royal Infantil', 'Académico Infantil'
-    ]
-  };
+  // =========== ESTADO PARA EQUIPOS POR CATEGORÍA ===========
+  const [equiposPorCategoria, setEquiposPorCategoria] = useState({});
+  const [todosLosEquipos, setTodosLosEquipos] = useState([]);
 
   // ESTADO: Datos de campeonatos
-  const [campeonatos, setCampeonatos] = useState([
-    {
-      id: 1,
-      nombre: 'Torneo Nacional 2024',
-      tipo: 'Liga',
-      genero: 'Mixto',
-      fecha_inicio: '2024-01-15',
-      fecha_fin: '2024-12-15',
-      organizador: 'Federación Boliviana',
-      estado: 'Activo',
-      formato: 'todos-contra-todos',
-      idaVuelta: true,
-      numSeries: 1,
-      categorias: ['Mayor', 'Sub-20', 'Femenino'],
-      series: [
-        {
-          nombre: 'Serie A',
-          equipos: ['Equipo A', 'Equipo B', 'Equipo C']
-        }
-      ]
-    },
-  ]);
+  const [campeonatos, setCampeonatos] = useState([]);
+  const [gestiones, setGestiones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // ESTADO: Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,6 +125,86 @@ export function CampeonatosPage() {
   const [showTablaPosiciones, setShowTablaPosiciones] = useState(false);
   const [campeonatoSeleccionado, setCampeonatoSeleccionado] = useState(null);
   const [categoriaSeleccionadaTabla, setCategoriaSeleccionadaTabla] = useState(null);
+  const [showModalCategorias, setShowModalCategorias] = useState(false);
+  const [campeonatoParaCategorias, setCampeonatoParaCategorias] = useState(null);
+
+  // Cargar campeonatos, gestiones y equipos desde la API al montar el componente
+  useEffect(() => {
+    cargarCampeonatos();
+    cargarGestiones();
+    cargarEquipos();
+  }, []);
+
+  const cargarGestiones = async () => {
+    try {
+      const response = await campeonatoService.getAllGestiones();
+      if (response.success && response.data) {
+        setGestiones(response.data);
+      }
+    } catch (err) {
+      console.error('Error al cargar gestiones:', err);
+    }
+  };
+
+  const cargarCampeonatos = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await campeonatoService.getAll();
+
+      if (response.success && response.data) {
+        // Transformar los datos del backend al formato del frontend
+        const campeonatosTransformados = response.data.map(c => ({
+          id_campeonato: c.id_campeonato,
+          nombre: c.nombre,
+          tipo: c.tipo,
+          genero: c.genero || 'Mixto',
+          fecha_inicio: c.fecha_inicio,
+          fecha_fin: c.fecha_fin,
+          organizador: c.organizador || 'N/A',
+          estado: c.c_estado,
+          formato: c.formato || 'todos-contra-todos',
+          idaVuelta: c.idaVuelta || true,
+          numSeries: c.numSeries || 1,
+          campeonatoCategorias: c.campeonatoCategorias || [],
+          categorias: c.categorias || [],
+          series: c.series || [],
+          id_gestion: c.id_gestion
+        }));
+        setCampeonatos(campeonatosTransformados);
+      }
+    } catch (err) {
+      console.error('Error al cargar campeonatos:', err);
+      setError(err.message || 'Error al cargar los campeonatos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // =========== CARGAR EQUIPOS DESDE LA BASE DE DATOS ===========
+  const cargarEquipos = async () => {
+    try {
+      const response = await equipoService.getAll();
+      if (response.success && response.data) {
+        setTodosLosEquipos(response.data);
+
+        // Agrupar equipos por categoría
+        const equiposPorCat = {};
+        response.data.forEach(equipo => {
+          const nombreCategoria = equipo.categoria?.nombre;
+          if (nombreCategoria) {
+            if (!equiposPorCat[nombreCategoria]) {
+              equiposPorCat[nombreCategoria] = [];
+            }
+            equiposPorCat[nombreCategoria].push(equipo.nombre);
+          }
+        });
+        setEquiposPorCategoria(equiposPorCat);
+      }
+    } catch (err) {
+      console.error('Error al cargar equipos:', err);
+    }
+  };
 
   // =========== DATOS DE POSICIONES POR CATEGORÍA Y GÉNERO ===========
   // Este es un ejemplo - en producción vendrían de una API
@@ -238,9 +279,6 @@ export function CampeonatosPage() {
     setShowTablaPosiciones(true);
   };
 
-  // ESTADO: Contador para IDs
-  const [nextId, setNextId] = useState(2);
-
   // Filtrar campeonatos por búsqueda
   const filteredCampeonatos = campeonatos.filter(c =>
     c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -259,57 +297,140 @@ export function CampeonatosPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro que deseas eliminar este campeonato?')) {
-      setCampeonatos(campeonatos.filter(c => c.id !== id));
+      try {
+        await campeonatoService.delete(id);
+        // Recargar campeonatos desde la API
+        await cargarCampeonatos();
+      } catch (err) {
+        console.error('Error al eliminar campeonato:', err);
+        alert(`Error al eliminar: ${err.message}`);
+      }
     }
   };
 
-  const handleFormSubmit = (formData) => {
-    if (editingCampeonato) {
-      setCampeonatos(campeonatos.map(c =>
-        c.id === editingCampeonato.id ? { ...c, ...formData } : c
-      ));
-    } else {
-      const newCampeonato = {
-        ...formData,
-        id: nextId,
-        formato: 'todos-contra-todos',
-        idaVuelta: true,
-        numSeries: 1,
-        categorias: [],
-        series: []
+  const handleFormSubmit = async (formData) => {
+    try {
+      // Transformar datos del frontend al formato del backend
+      const campeonatoData = {
+        nombre: formData.nombre,
+        tipo: formData.tipo,
+        id_gestion: parseInt(formData.id_gestion),
+        fecha_inicio: formData.fecha_inicio,
+        fecha_fin: formData.fecha_fin,
+        c_estado: formData.estado || 'programado',
+        genero: formData.genero,
+        organizador: formData.organizador
       };
-      setCampeonatos([...campeonatos, newCampeonato]);
-      setNextId(nextId + 1);
+
+      if (editingCampeonato) {
+        // Actualizar campeonato existente
+        const response = await campeonatoService.update(editingCampeonato.id, campeonatoData);
+
+        if (response.success) {
+          // Recargar campeonatos desde la API
+          await cargarCampeonatos();
+        }
+      } else {
+        // Crear nuevo campeonato
+        const response = await campeonatoService.create(campeonatoData);
+
+        if (response.success) {
+          // Recargar campeonatos desde la API
+          await cargarCampeonatos();
+
+          // Abrir modal de categorías automáticamente
+          setCampeonatoParaCategorias({
+            id_campeonato: response.data.id_campeonato || response.data.id_cc,
+            nombre: response.data.nombre
+          });
+          setShowModalCategorias(true);
+        }
+      }
+
+      setIsModalOpen(false);
+      setEditingCampeonato(null);
+    } catch (err) {
+      console.error('Error al guardar campeonato:', err);
+      alert(`Error al guardar: ${err.message}`);
     }
-    setIsModalOpen(false);
   };
 
   const handleConfigureFormat = (campeonato) => {
+    // Obtener categorías del campeonato - ahora viene como campeonatoCategorias
+    const categoriasDelCampeonato = campeonato.campeonatoCategorias || campeonato.categorias || [];
+    const nombresCategorias = categoriasDelCampeonato.map(cat =>
+      cat.categoria?.nombre || cat.Categoria?.nombre || 'Sin nombre'
+    );
+
     setFormatConfig({
-      id: campeonato.id,
+      id: campeonato.id_campeonato,
       configPorCategoria: campeonato.configPorCategoria || {},
-      categoriaSeleccionada: getAllCategories()[0]
+      categoriaSeleccionada: nombresCategorias[0],
+      categoriasDisponibles: nombresCategorias
     });
     setShowFormatModal(true);
   };
 
-  const handleSaveFormat = () => {
-    setCampeonatos(campeonatos.map(c =>
-      c.id === formatConfig.id
-        ? {
-            ...c,
-            configPorCategoria: formatConfig.configPorCategoria || {},
-            categorias: Object.keys(formatConfig.configPorCategoria || {})
+  const handleSaveFormat = async () => {
+    try {
+      // Guardar la configuración de cada categoría en la base de datos
+      const categorias = Object.keys(formatConfig.configPorCategoria || {});
+
+      for (const nombreCategoria of categorias) {
+        const config = formatConfig.configPorCategoria[nombreCategoria];
+
+        // Buscar el id_cc de esta categoría
+        const campeonato = campeonatos.find(c => c.id_campeonato === formatConfig.id);
+        const categoriasArray = campeonato?.campeonatoCategorias || campeonato?.categorias || [];
+
+        if (categoriasArray.length > 0) {
+          const categoriaData = categoriasArray.find(cat =>
+            cat.categoria?.nombre === nombreCategoria || cat.Categoria?.nombre === nombreCategoria
+          );
+
+          if (categoriaData && categoriaData.id_cc) {
+            // Preparar los datos de configuración
+            const configuracion = {
+              formato: config.formato === 'todos-contra-todos' ? 'todos_vs_todos' :
+                       config.formato === 'series' ? 'grupos_y_eliminacion' :
+                       config.formato === 'fases' ? 'grupos_y_eliminacion' : 'todos_vs_todos',
+              numero_grupos: config.formato === 'series' ? config.numSeries :
+                             config.formato === 'fases' ? config.fases?.[0]?.series?.length : null,
+              ida_vuelta: config.idaVuelta !== undefined ? config.idaVuelta : false,
+              dias_entre_jornadas: config.diasEntreJornadas || 7,
+              hora_inicio_partidos: config.horaInicio || '18:00:00',
+              dias_juego: config.diasJuego || null
+            };
+
+            // Guardar en la base de datos
+            await categoriaService.updateConfiguracion(categoriaData.id_cc, configuracion);
           }
-        : c
-    ));
-    setShowFormatModal(false);
+        }
+      }
+
+      // Actualizar el estado local
+      setCampeonatos(campeonatos.map(c =>
+        c.id_campeonato === formatConfig.id
+          ? {
+              ...c,
+              configPorCategoria: formatConfig.configPorCategoria || {},
+              categorias: Object.keys(formatConfig.configPorCategoria || {})
+            }
+          : c
+      ));
+
+      setShowFormatModal(false);
+      alert('✅ Configuración guardada exitosamente');
+    } catch (error) {
+      console.error('Error al guardar configuración:', error);
+      alert('❌ Error al guardar la configuración: ' + error.message);
+    }
   };
 
   const getAllCategories = () => {
-    return Object.keys(equiposPorCategoria);
+    return formatConfig.categoriasDisponibles || Object.keys(equiposPorCategoria);
   };
 
   // =========== OBTENER EQUIPOS PARA UNA CATEGORÍA ===========
@@ -459,22 +580,26 @@ export function CampeonatosPage() {
         <div className="text-gray-600">{value}</div>
       )
     },
-    {
+    {/*{
       key: 'organizador',
       label: 'Organizador',
       render: (value) => (
         <div className="text-gray-600">{value}</div>
       )
-    },
+    },*/},
     {
       key: 'estado',
       label: 'Estado',
       render: (value) => (
         <div className={`px-3 py-1 rounded-full text-sm font-medium w-fit ${
-          value === 'Activo'
+          value === 'programado'
+            ? 'bg-yellow-100 text-yellow-700'
+            : value === 'en_curso'
             ? 'bg-green-100 text-green-700'
-            : value === 'Completado'
+            : value === 'finalizado'
             ? 'bg-blue-100 text-blue-700'
+            : value === 'suspendido'
+            ? 'bg-orange-100 text-orange-700'
             : 'bg-red-100 text-red-700'
         }`}>
           {value}
@@ -482,23 +607,59 @@ export function CampeonatosPage() {
       )
     },
     {
+      key: 'categorias',
+      label: 'Categorías',
+      render: (value, campeonato) => (
+        <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold w-fit">
+          {campeonato.categorias?.length || 0} categoría{campeonato.categorias?.length !== 1 ? 's' : ''}
+        </div>
+      )
+    },
+    {
       key: 'acciones',
       label: 'Acciones',
       render: (value, campeonato) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
+            onClick={() => {
+              setCampeonatoParaCategorias({
+                id_campeonato: campeonato.id_campeonato,
+                nombre: campeonato.nombre
+              });
+              setShowModalCategorias(true);
+            }}
+            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
+            title="Configurar categorías"
+          >
+            🏷️ Categorías
+          </button>
+          {/*<button
             onClick={() => handleVerTablaPosiciones(campeonato)}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
             title="Ver tabla de posiciones"
           >
             📊 Tabla
-          </button>
+          </button>*/}
           <button
             onClick={() => handleConfigureFormat(campeonato)}
             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
             title="Configurar formato y equipos"
           >
             ⚙️ Configurar
+          </button>
+          <button
+            onClick={() => handleEdit(campeonato)}
+            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            title="Editar campeonato"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={() => handleDelete(campeonato.id_campeonato)}
+            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            title="Eliminar campeonato"
+          >
+            <Trash2 size={16} />
           </button>
         </div>
       )
@@ -517,9 +678,28 @@ export function CampeonatosPage() {
     {
       name: 'tipo',
       label: 'Tipo',
-      type: 'text',
-      placeholder: 'Ej: Liga, Torneo, Copa',
-      required: true
+      type: 'select',
+      placeholder: 'Selecciona el tipo',
+      required: true,
+      options: [
+        { value: 'campeonato', label: 'Campeonato' },
+        { value: 'liga', label: ' Liga' },
+        { value: 'copa', label: ' Copa' },
+        { value: 'relampago', label: ' Relámpago' },
+        { value: 'amistoso', label: 'Amistoso' },
+        { value: 'torneo', label: 'Torneo' }
+      ]
+    },
+    {
+      name: 'id_gestion',
+      label: 'Gestión/Año',
+      type: 'select',
+      placeholder: 'Selecciona la gestión',
+      required: true,
+      options: gestiones.map(g => ({
+        value: g.id_gestion,
+        label: `${g.gestion} - ${g.descripcion || ''}`
+      }))
     },
     {
       name: 'genero',
@@ -545,21 +725,59 @@ export function CampeonatosPage() {
       type: 'date',
       required: true
     },
-    {
+    /*{
       name: 'organizador',
       label: 'Organizador',
       type: 'text',
       placeholder: 'Ej: Federación Boliviana',
       required: true
-    },
+    },*/
     {
       name: 'estado',
       label: 'Estado',
-      type: 'text',
-      placeholder: 'Ej: Activo, Completado, Cancelado',
-      required: true
+      type: 'select',
+      placeholder: 'Selecciona el estado',
+      required: true,
+      options: [
+        { value: 'programado', label: '📅 Programado' },
+        { value: 'en_curso', label: '▶️ En Curso' },
+        { value: 'finalizado', label: '✅ Finalizado' },
+        { value: 'suspendido', label: '⏸️ Suspendido' },
+        { value: 'cancelado', label: '❌ Cancelado' }
+      ]
     }
   ];
+
+  // Mostrar estado de carga
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando campeonatos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar error si existe
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error al cargar campeonatos</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={cargarCampeonatos}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -640,7 +858,7 @@ export function CampeonatosPage() {
 
       {/* Modal de Configuración de Formato */}
       {showFormatModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center p-2 z-50">
           <div className="bg-white rounded-lg shadow-xl w-[95vw] max-h-[95vh] overflow-y-auto">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-blue-50 sticky top-0">
@@ -741,6 +959,87 @@ export function CampeonatosPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Configuración de Fixture */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📅 Días entre jornadas
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={obtenerConfigCategoria().diasEntreJornadas || 7}
+                        onChange={(e) => actualizarConfigCategoria({
+                          diasEntreJornadas: parseInt(e.target.value) || 7
+                        })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="7"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Días de separación entre cada jornada</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        🕐 Hora de inicio
+                      </label>
+                      <input
+                        type="time"
+                        value={obtenerConfigCategoria().horaInicio || '18:00'}
+                        onChange={(e) => actualizarConfigCategoria({
+                          horaInicio: e.target.value + ':00'
+                        })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Hora predeterminada de los partidos</p>
+                    </div>
+                  </div>
+
+                  {/* Días de Juego */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      📆 Días de juego
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 0, label: 'Dom' },
+                        { value: 1, label: 'Lun' },
+                        { value: 2, label: 'Mar' },
+                        { value: 3, label: 'Mié' },
+                        { value: 4, label: 'Jue' },
+                        { value: 5, label: 'Vie' },
+                        { value: 6, label: 'Sáb' }
+                      ].map((dia) => {
+                        const diasJuego = obtenerConfigCategoria().diasJuego || [];
+                        const isSelected = diasJuego.includes(dia.value);
+
+                        return (
+                          <button
+                            key={dia.value}
+                            type="button"
+                            onClick={() => {
+                              const current = obtenerConfigCategoria().diasJuego || [];
+                              const newDias = isSelected
+                                ? current.filter(d => d !== dia.value)
+                                : [...current, dia.value].sort((a, b) => a - b);
+                              actualizarConfigCategoria({ diasJuego: newDias });
+                            }}
+                            className={`px-4 py-2 rounded-lg border-2 font-semibold text-sm transition-all ${
+                              isSelected
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            }`}
+                          >
+                            {dia.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Selecciona los días de la semana en que se jugarán los partidos de esta categoría
+                    </p>
                   </div>
 
                   {/* ============ FORMATO: SERIES ============ */}
@@ -1442,6 +1741,19 @@ export function CampeonatosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Categorías */}
+      <ModalCategoriaCampeonato
+        isOpen={showModalCategorias}
+        onClose={() => {
+          setShowModalCategorias(false);
+          setCampeonatoParaCategorias(null);
+        }}
+        campeonato={campeonatoParaCategorias}
+        onSave={() => {
+          cargarCampeonatos();
+        }}
+      />
     </div>
   );
 }
