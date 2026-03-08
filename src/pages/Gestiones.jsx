@@ -17,7 +17,7 @@ export function GestionesPage() {
   const API_URL = 'http://localhost:8080/api/gestion';
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
   };
 

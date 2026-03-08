@@ -17,7 +17,7 @@ export const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 10000;
  */
 export async function request(url, options = {}) {
   // Obtener token de autenticación si existe
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
 
   // Configurar headers por defecto
   const defaultHeaders = {
@@ -60,8 +60,9 @@ export async function request(url, options = {}) {
 
       // Si es 401 (no autorizado), redirigir a login
       if (res.status === 401) {
-        localStorage.removeItem('token');
-        window.location.href = '/login';
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('usuario');
+        window.location.href = '/';
       }
 
       throw new Error(errorData.message || `Error HTTP ${res.status}`);

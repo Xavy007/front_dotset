@@ -75,7 +75,7 @@ export function PlanillaPartido() {
   const API_URL_PARTIDO = 'http://localhost:8080/api/partidos';
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
   };
 

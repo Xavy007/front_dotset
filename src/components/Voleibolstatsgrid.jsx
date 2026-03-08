@@ -5,7 +5,7 @@ const API_BASE_URL = 'http://localhost:8080/api';
 
 const getAuthHeaders = () => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('token')}`
+  'Authorization': `Bearer ${sessionStorage.getItem('token')}`
 });
 
 export default function VoleibolStatsGrid() {

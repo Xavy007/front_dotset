@@ -1,3 +1,29 @@
+/**
+ * @file Campeonatos.jsx
+ * @description Página principal de gestión de campeonatos del sistema PuntoSet.
+ *
+ * Implementa el flujo completo de administración de competencias deportivas:
+ *
+ *   1. Listado de campeonatos con búsqueda y acciones CRUD.
+ *   2. Creación / edición de campeonatos mediante FormModal genérico.
+ *   3. Asignación de categorías al campeonato (ModalCategoriaCampeonato).
+ *   4. Configuración del formato competitivo por categoría:
+ *        - Todos contra todos (liga round-robin).
+ *        - Series / grupos con drag-and-drop de equipos.
+ *        - Fases con múltiples series anidadas.
+ *   5. Persistencia de la configuración en el backend mediante
+ *      categoriaService.updateConfiguracion().
+ *
+ * Arquitectura de datos:
+ *   Campeonato → CampeonatoCategoria (id_cc) → Inscripcion → Equipo
+ *
+ * Los equipos mostrados en el panel de configuración son exclusivamente
+ * aquellos inscritos en la categoría correspondiente (inscripcionService.getByCC),
+ * garantizando que la configuración refleje el estado real del campeonato.
+ *
+ * @module pages/Campeonatos
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Trophy, Plus, Search, Edit2, Trash2, X, Shuffle } from 'lucide-react';
 import DataTable from '../components/Datatable';
@@ -6,8 +32,20 @@ import ModalCategoriaCampeonato from '../components/ModalCategoriaCampeonato';
 import { campeonatoService } from '../services/campeonatoService';
 import { equipoService } from '../services/equipoService';
 import { categoriaService } from '../services/categoriaService';
+import { inscripcionService } from '../services/inscripcionService';
 
-// =========== MAPEO DE LOGOS/IMÁGENES DE CLUBES ===========
+/* ═══════════════════════════════════════════════════════════════════
+   SECCIÓN: Recursos estáticos
+   Mapeo de nombres de equipos a URLs de logos. Actúa como caché
+   de imágenes para el panel de drag-and-drop. Los equipos sin entrada
+   reciben un placeholder generado dinámicamente.
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Diccionario de URLs de logos indexado por nombre de equipo.
+ * Se utiliza en las tarjetas de equipo del panel de configuración.
+ * @type {Object.<string, string>}
+ */
 const LOGOS_CLUBES = {
   'Bolívar': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Club_Bol%C3%ADvar_Logo.svg/200px-Club_Bol%C3%ADvar_Logo.svg.png',
   'Strongest': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/The_Strongest_La_Paz.svg/200px-The_Strongest_La_Paz.svg.png',
@@ -26,12 +64,41 @@ const LOGOS_CLUBES = {
   'Aurora': 'https://via.placeholder.com/80?text=AU',
 };
 
+/**
+ * Resuelve la URL del logo de un equipo normalizando el nombre.
+ * Elimina sufijos de categoría (U-20, U-17, Fem, Infantil) antes de buscar
+ * en el diccionario, de modo que las filiales comparten el logo del club padre.
+ *
+ * @param {string} equipo - Nombre del equipo (puede incluir sufijo de categoría).
+ * @returns {string} URL del logo, o URL de placeholder si no existe entrada.
+ */
 const getLogoUrl = (equipo) => {
   const equipoBase = equipo.replace(/ (U-20|U-17|Fem|Infantil)$/, '');
   return LOGOS_CLUBES[equipoBase] || 'https://via.placeholder.com/80?text=Logo';
 };
 
-// =========== COMPONENTE TARJETA DE EQUIPO ===========
+/* ═══════════════════════════════════════════════════════════════════
+   SECCIÓN: Componentes auxiliares de drag-and-drop
+   Tarjetas visuales utilizadas en el panel de configuración del
+   formato competitivo. Implementan la API nativa de arrastre del
+   navegador (HTML5 Drag and Drop API) a través del atributo `draggable`
+   y el evento `onDragStart`.
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Tarjeta de equipo arrastrable para el panel de equipos disponibles.
+ * Muestra el logo del club como fondo y el nombre como overlay con gradiente.
+ *
+ * @component
+ * @param {object}    props
+ * @param {string}    props.equipo       - Nombre del equipo a mostrar.
+ * @param {function}  props.onDragStart  - Callback del evento dragstart de la API
+ *                                         nativa de drag-and-drop del navegador.
+ * @param {function}  [props.onClick]    - Callback opcional al hacer clic.
+ * @param {boolean}   [props.removable]  - Si true, muestra botón de eliminación.
+ * @param {function}  [props.onRemove]   - Callback al presionar el botón de eliminar.
+ * @returns {JSX.Element} Tarjeta de equipo con imagen de fondo.
+ */
 const TeamCard = ({ equipo, onDragStart, onClick, removable = false, onRemove }) => {
   const logoUrl = getLogoUrl(equipo);
 
@@ -70,6 +137,18 @@ const TeamCard = ({ equipo, onDragStart, onClick, removable = false, onRemove })
   );
 };
 
+/**
+ * Tarjeta de equipo ya asignado a una serie o grupo.
+ * Diferenciada visualmente de TeamCard mediante un overlay azul y
+ * un borde de selección, indicando pertenencia al fixture configurado.
+ * El botón de eliminación se revela al pasar el cursor (hover).
+ *
+ * @component
+ * @param {object}   props
+ * @param {string}   props.equipo    - Nombre del equipo seleccionado.
+ * @param {function} props.onRemove  - Callback para quitar el equipo de la serie.
+ * @returns {JSX.Element} Tarjeta de equipo en estado seleccionado.
+ */
 const SelectedTeamCard = ({ equipo, onRemove }) => {
   const logoUrl = getLogoUrl(equipo);
 
@@ -105,36 +184,91 @@ const SelectedTeamCard = ({ equipo, onRemove }) => {
   );
 };
 
+/**
+ * Página principal de gestión de campeonatos.
+ *
+ * Concentra el estado global de la vista y orquesta los distintos flujos
+ * de interacción: CRUD de campeonatos, asignación de categorías y
+ * configuración del formato competitivo con asignación de equipos.
+ *
+ * @component
+ * @returns {JSX.Element} Vista completa de gestión de campeonatos.
+ */
 export function CampeonatosPage() {
-  // =========== ESTADO PARA EQUIPOS POR CATEGORÍA ===========
+
+  /* ─────────────────────────────────────────────────
+   * Estado: equipos inscritos por categoría
+   * Cargado dinámicamente al abrir el modal de configuración.
+   * Estructura: { [nombreCategoria]: string[] }
+   * ───────────────────────────────────────────────── */
   const [equiposPorCategoria, setEquiposPorCategoria] = useState({});
   const [todosLosEquipos, setTodosLosEquipos] = useState([]);
 
-  // ESTADO: Datos de campeonatos
+  /* ─────────────────────────────────────────────────
+   * Estado: datos principales de la vista
+   * ───────────────────────────────────────────────── */
+  /** Lista completa de campeonatos cargada desde el backend. */
   const [campeonatos, setCampeonatos] = useState([]);
+
+  /** Lista de gestiones/años disponibles para asociar al campeonato. */
   const [gestiones, setGestiones] = useState([]);
+
+  /** Indica si la carga inicial de datos está en progreso. */
   const [loading, setLoading] = useState(true);
+
+  /** Mensaje de error en caso de fallo al cargar los campeonatos. */
   const [error, setError] = useState(null);
 
-  // ESTADO: Modal
+  /* ─────────────────────────────────────────────────
+   * Estado: control de modales y flujo de navegación
+   * ───────────────────────────────────────────────── */
+  /** Controla la visibilidad del FormModal de creación/edición. */
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  /** Campeonato en edición. null indica modo creación. */
   const [editingCampeonato, setEditingCampeonato] = useState(null);
+
+  /** Término de búsqueda para filtrar la tabla de campeonatos. */
   const [searchTerm, setSearchTerm] = useState('');
+
+  /** Controla la visibilidad del modal de configuración de formato. */
   const [showFormatModal, setShowFormatModal] = useState(false);
+
+  /**
+   * Configuración activa del formato competitivo.
+   * Estructura: { id, configPorCategoria, categoriaSeleccionada, categoriasDisponibles }
+   */
   const [formatConfig, setFormatConfig] = useState({});
+
+  /** Controla la visibilidad de la tabla de posiciones. */
   const [showTablaPosiciones, setShowTablaPosiciones] = useState(false);
+
+  /** Campeonato seleccionado para ver su tabla de posiciones. */
   const [campeonatoSeleccionado, setCampeonatoSeleccionado] = useState(null);
+
+  /** Categoría activa en la vista de tabla de posiciones. */
   const [categoriaSeleccionadaTabla, setCategoriaSeleccionadaTabla] = useState(null);
+
+  /** Controla la visibilidad del modal de asignación de categorías. */
   const [showModalCategorias, setShowModalCategorias] = useState(false);
+
+  /** Campeonato destino para la asignación de categorías. */
   const [campeonatoParaCategorias, setCampeonatoParaCategorias] = useState(null);
 
-  // Cargar campeonatos, gestiones y equipos desde la API al montar el componente
+  /* ─────────────────────────────────────────────────
+   * Carga inicial de datos al montar el componente.
+   * Se obtienen campeonatos y gestiones en paralelo para
+   * minimizar el tiempo de espera del usuario.
+   * ───────────────────────────────────────────────── */
   useEffect(() => {
     cargarCampeonatos();
     cargarGestiones();
-    cargarEquipos();
   }, []);
 
+  /**
+   * Obtiene la lista de gestiones (años de competencia) disponibles.
+   * Las gestiones se usan para poblar el selector del formulario de campeonato.
+   */
   const cargarGestiones = async () => {
     try {
       const response = await campeonatoService.getAllGestiones();
@@ -146,6 +280,12 @@ export function CampeonatosPage() {
     }
   };
 
+  /**
+   * Obtiene todos los campeonatos desde la API y los transforma al modelo
+   * de datos del frontend. La transformación normaliza nombres de propiedades
+   * y provee valores por defecto para campos opcionales, desacoplando la vista
+   * del esquema de respuesta del backend.
+   */
   const cargarCampeonatos = async () => {
     try {
       setLoading(true);
@@ -287,16 +427,27 @@ export function CampeonatosPage() {
 
   // =========== CRUD OPERATIONS ===========
 
+  /**
+   * Abre el modal en modo creación, limpiando cualquier campeonato en edición.
+   */
   const handleCreate = () => {
     setEditingCampeonato(null);
     setIsModalOpen(true);
   };
 
+  /**
+   * Abre el modal en modo edición con los datos del campeonato seleccionado.
+   * @param {object} campeonato - Objeto campeonato a editar.
+   */
   const handleEdit = (campeonato) => {
     setEditingCampeonato(campeonato);
     setIsModalOpen(true);
   };
 
+  /**
+   * Elimina un campeonato previa confirmación del usuario.
+   * @param {number} id - ID del campeonato a eliminar.
+   */
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro que deseas eliminar este campeonato?')) {
       try {
@@ -310,6 +461,18 @@ export function CampeonatosPage() {
     }
   };
 
+  /**
+   * Maneja el envío del formulario de creación y edición de campeonatos.
+   *
+   * En modo creación: persiste el campeonato y abre automáticamente el modal
+   * de asignación de categorías (ModalCategoriaCampeonato), implementando el
+   * flujo guiado: Crear → Categorías → Configurar formato.
+   *
+   * En modo edición: actualiza el campeonato. Se usa `id_campeonato` como
+   * identificador principal, con fallback a `id` para compatibilidad.
+   *
+   * @param {object} formData - Datos del formulario tal como los emite FormModal.
+   */
   const handleFormSubmit = async (formData) => {
     try {
       // Transformar datos del frontend al formato del backend
@@ -320,13 +483,12 @@ export function CampeonatosPage() {
         fecha_inicio: formData.fecha_inicio,
         fecha_fin: formData.fecha_fin,
         c_estado: formData.estado || 'programado',
-        genero: formData.genero,
         organizador: formData.organizador
       };
 
       if (editingCampeonato) {
         // Actualizar campeonato existente
-        const response = await campeonatoService.update(editingCampeonato.id, campeonatoData);
+        const response = await campeonatoService.update(editingCampeonato.id_campeonato || editingCampeonato.id, campeonatoData);
 
         if (response.success) {
           // Recargar campeonatos desde la API
@@ -357,12 +519,37 @@ export function CampeonatosPage() {
     }
   };
 
-  const handleConfigureFormat = (campeonato) => {
-    // Obtener categorías del campeonato - ahora viene como campeonatoCategorias
+  /**
+   * Abre el modal de configuración del formato competitivo para un campeonato.
+   *
+   * Carga de forma asíncrona los equipos inscritos en cada categoría del
+   * campeonato consultando el endpoint de inscripciones por id_cc. Este enfoque
+   * garantiza que solo aparezcan en el panel de drag-and-drop los equipos que
+   * efectivamente participan en cada categoría, evitando mostrar equipos
+   * registrados en el sistema pero no inscritos en esta competencia.
+   *
+   * @param {object} campeonato - Campeonato cuyo formato se va a configurar.
+   */
+  const handleConfigureFormat = async (campeonato) => {
     const categoriasDelCampeonato = campeonato.campeonatoCategorias || campeonato.categorias || [];
     const nombresCategorias = categoriasDelCampeonato.map(cat =>
       cat.categoria?.nombre || cat.Categoria?.nombre || 'Sin nombre'
     );
+
+    // Cargar equipos inscritos por cada categoría del campeonato (por id_cc)
+    const equiposPorCat = {};
+    for (const cc of categoriasDelCampeonato) {
+      const nombreCat = cc.categoria?.nombre || cc.Categoria?.nombre || 'Sin nombre';
+      try {
+        const resp = await inscripcionService.getByCC(cc.id_cc);
+        equiposPorCat[nombreCat] = (resp.success && resp.data)
+          ? resp.data.map(insc => insc.equipo?.nombre).filter(Boolean)
+          : [];
+      } catch {
+        equiposPorCat[nombreCat] = [];
+      }
+    }
+    setEquiposPorCategoria(equiposPorCat);
 
     setFormatConfig({
       id: campeonato.id_campeonato,
@@ -373,9 +560,19 @@ export function CampeonatosPage() {
     setShowFormatModal(true);
   };
 
+  /**
+   * Persiste la configuración del formato competitivo en el backend.
+   *
+   * Itera sobre cada categoría configurada, localiza su `id_cc` dentro del
+   * campeonato activo y realiza un PUT a /campeonato-categoria/:id_cc/configuracion.
+   * El mapeo de formatos traduce los identificadores internos del frontend al
+   * esquema de la API:
+   *   'todos-contra-todos' → 'todos_vs_todos'
+   *   'series' / 'fases'   → 'grupos_y_eliminacion'
+   */
   const handleSaveFormat = async () => {
     try {
-      // Guardar la configuración de cada categoría en la base de datos
+      // Iterar sobre cada categoría con configuración activa
       const categorias = Object.keys(formatConfig.configPorCategoria || {});
 
       for (const nombreCategoria of categorias) {
@@ -433,12 +630,23 @@ export function CampeonatosPage() {
     return formatConfig.categoriasDisponibles || Object.keys(equiposPorCategoria);
   };
 
-  // =========== OBTENER EQUIPOS PARA UNA CATEGORÍA ===========
+  /**
+   * Retorna todos los equipos inscritos en una categoría del campeonato activo.
+   * @param {string} categoria - Nombre de la categoría.
+   * @returns {string[]} Arreglo de nombres de equipos inscritos.
+   */
   const getTodosEquiposPorCategoria = (categoria) => {
     return equiposPorCategoria[categoria] || [];
   };
 
-  // =========== OBTENER EQUIPOS DISPONIBLES (NO ASIGNADOS) ===========
+  /**
+   * Retorna los equipos de una categoría que aún no han sido asignados
+   * a ninguna serie o grupo en la configuración activa.
+   * Realiza la diferencia de conjuntos entre todos los inscritos y los ya asignados.
+   *
+   * @param {string} categoria - Nombre de la categoría.
+   * @returns {string[]} Equipos disponibles para asignar.
+   */
   const getEquiposDisponiblesPorCategoria = (categoria) => {
     const config = obtenerConfigCategoria(categoria);
     
@@ -458,7 +666,16 @@ export function CampeonatosPage() {
     return todosEquipos.filter(eq => !equiposAsignados.includes(eq));
   };
 
-  // =========== OBTENER Y ACTUALIZAR CONFIGURACIÓN POR CATEGORÍA ===========
+  /**
+   * Obtiene la configuración del formato competitivo para una categoría dada.
+   * Si la categoría no tiene configuración previa, la inicializa con valores
+   * por defecto (todos-contra-todos, ida y vuelta, sin series).
+   * Actúa como accessor/factory del objeto de configuración por categoría.
+   *
+   * @param {string} [categoria] - Nombre de la categoría. Si se omite, usa
+   *                               la categoría actualmente seleccionada en el modal.
+   * @returns {object} Objeto de configuración de la categoría.
+   */
   const obtenerConfigCategoria = (categoria = null) => {
     const cat = categoria || formatConfig.categoriaSeleccionada;
     if (!formatConfig.configPorCategoria) {
@@ -535,7 +752,12 @@ export function CampeonatosPage() {
     actualizarConfigCategoria({ series: newSeries });
   };
 
-  // Configurar columnas de la tabla
+  /* ─────────────────────────────────────────────────
+   * Definición de columnas para el componente DataTable.
+   * Cada columna especifica la clave del dato, su etiqueta visible
+   * y opcionalmente una función `render` para personalizar el contenido
+   * de la celda (badges de estado, fechas formateadas, botones de acción).
+   * ───────────────────────────────────────────────── */
   const columns = [
     {
       key: 'nombre',
@@ -666,7 +888,17 @@ export function CampeonatosPage() {
     }
   ];
 
-  // Campos del formulario
+  /* ─────────────────────────────────────────────────
+   * Definición de campos para el FormModal de campeonato.
+   * Sigue el patrón configuration-driven form: cada objeto describe
+   * un campo con su tipo, validaciones y opciones, sin necesidad de
+   * escribir JSX específico para este formulario.
+   *
+   * Campos con lógica dinámica:
+   *   - id_gestion: opciones cargadas desde el estado `gestiones`.
+   *   - fecha_fin:  minDate = fecha_inicio (para impedir fechas inválidas).
+   *   - Ambas fechas usan allowFuture=true para planificación futura.
+   * ───────────────────────────────────────────────── */
   const formFields = [
     {
       name: 'nombre',
@@ -702,28 +934,19 @@ export function CampeonatosPage() {
       }))
     },
     {
-      name: 'genero',
-      label: 'Género/Categoría',
-      type: 'select',
-      placeholder: 'Selecciona género',
-      required: true,
-      options: [
-        { value: 'Hombres', label: '👨 Hombres' },
-        { value: 'Mujeres', label: '👩 Mujeres' },
-        { value: 'Mixto', label: '👥 Mixto' }
-      ]
-    },
-    {
       name: 'fecha_inicio',
       label: 'Fecha de Inicio',
       type: 'date',
-      required: true
+      required: true,
+      allowFuture: true
     },
     {
       name: 'fecha_fin',
       label: 'Fecha de Fin',
       type: 'date',
-      required: true
+      required: true,
+      allowFuture: true,
+      getMinDate: (formData) => formData.fecha_inicio || null,
     },
     /*{
       name: 'organizador',
@@ -1125,7 +1348,15 @@ export function CampeonatosPage() {
                                 </span>
                               </div>
 
-                              {/* Zona Drop */}
+                              {/*
+                                Zona de soltar (drop target) para cada serie.
+                                Implementa los eventos de la API HTML5 Drag and Drop:
+                                  - onDragOver: previene el comportamiento por defecto
+                                    (que rechazaría el drop) y aplica feedback visual.
+                                  - onDragLeave: elimina el feedback visual al salir.
+                                  - onDrop: lee el nombre del equipo desde dataTransfer,
+                                    lo agrega a la serie y lo elimina de las disponibles.
+                              */}
                               <div
                                 onDragOver={(e) => {
                                   e.preventDefault();

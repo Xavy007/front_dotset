@@ -51,7 +51,7 @@ export function JugadoresPage() {
 
   const getUsuarioLogueado = () => {
     try {
-      const raw = localStorage.getItem('usuario');
+      const raw = sessionStorage.getItem('usuario');
       if (!raw) return {};
 
       const parsed = JSON.parse(raw);
@@ -124,7 +124,7 @@ const fetchCategorias = async () => {
   }
 };
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
   };
 

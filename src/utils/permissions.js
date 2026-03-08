@@ -92,7 +92,7 @@ export const tienePermiso = (rol, modulo, accion) => {
 // Obtener usuario actual
 export const getUsuarioActual = () => {
   try {
-    const userStr = localStorage.getItem('usuario');
+    const userStr = sessionStorage.getItem('usuario');
     return userStr ? JSON.parse(userStr) : null;
   } catch (error) {
     console.error('Error al obtener usuario:', error);

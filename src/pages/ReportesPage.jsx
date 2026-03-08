@@ -119,7 +119,7 @@ export function ReportesPage() {
 
   const cargarJornadas = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(
         `${API_BASE}/jornadas/campeonato-categoria/${categoriaSeleccionada.id_cc}`,
         {
@@ -147,7 +147,7 @@ export function ReportesPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       // Cargar todos los partidos del id_cc y filtrar por jornada
       const response = await fetch(
         `${API_BASE}/fixture/cc/${categoriaSeleccionada.id_cc}`,
@@ -206,7 +206,7 @@ export function ReportesPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(
         `${API_BASE}/fixture/cc/${categoriaSeleccionada.id_cc}`,
         {

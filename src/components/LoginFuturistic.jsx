@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE } from '../services/api.config'
 
 export default function LoginFuturistic() {
   const [email, setEmail] = useState('')
@@ -14,7 +15,7 @@ export default function LoginFuturistic() {
 
   const MAX_ATTEMPTS = 5
   const BLOCK_TIME = 2 * 60 * 1000 // 2 minutos en milisegundos
-  const API_URL = 'http://localhost:8080/api/auth/login'
+  const API_URL = `${API_BASE}/auth/login`
 
   // ========== VERIFICAR SI ESTÁ BLOQUEADO AL CARGAR ==========
   useEffect(() => {
@@ -130,18 +131,15 @@ export default function LoginFuturistic() {
         localStorage.removeItem('loginBlocked')
         localStorage.removeItem('blockedUntil')
         
-        // Guardar token y datos del usuario
+        // Guardar token y datos del usuario (por pestaña — sessionStorage)
         if (data.token) {
-          localStorage.setItem('token', data.token)
+          sessionStorage.setItem('token', data.token)
         }
-        
+
         if (data.usuario) {
-          
-          localStorage.setItem('usuario', JSON.stringify(data.usuario))
-
+          sessionStorage.setItem('usuario', JSON.stringify(data.usuario))
         }
 
-        console.log('Login exitoso:', email)
         navigate('/app')
       } else {
         // ❌ CREDENCIALES INCORRECTAS

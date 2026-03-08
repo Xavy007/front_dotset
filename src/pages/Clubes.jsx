@@ -23,7 +23,7 @@ export function ClubesPage() {
   const API_URL = 'http://localhost:8080/api/club';
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return { 
       'Authorization': `Bearer ${token}`
     };
@@ -41,7 +41,7 @@ export function ClubesPage() {
     setError(null);
     try {
       const res = await fetch(API_URL, { 
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } 
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` } 
       });
       if (!res.ok) throw new Error('Error al cargar clubes');
       const data = await res.json();
@@ -214,7 +214,7 @@ export function ClubesPage() {
       const res = await fetch(`${API_URL}/${club.id_club}/estado`, {
         method: 'PUT',
         headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ estado: nuevoEstado })

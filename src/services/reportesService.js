@@ -5,7 +5,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api
 
 // Función helper para hacer peticiones
 const request = async (url, options = {}) => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
 
   const config = {
     ...options,

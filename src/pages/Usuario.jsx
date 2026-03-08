@@ -44,7 +44,7 @@ export function UsuariosPage() {
   const API_URL_CLUB = 'http://localhost:8080/api/club'; // 👉 NUEVO, ajusta si es distinto
   const API_URL_c = 'http://localhost:8080/api';
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
   };
 

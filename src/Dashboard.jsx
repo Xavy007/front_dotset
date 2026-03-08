@@ -67,23 +67,18 @@ export default function Dashboard() {
   const [userRol, setUserRol] = useState(''); 
   
   useEffect(() => {
-    const raw = localStorage.getItem('usuario');
-    const rol = raw ? JSON.parse(raw).rol : null; 
-    console.log(rol);
+    const raw = sessionStorage.getItem('usuario');
+    const rol = raw ? JSON.parse(raw).rol : null;
     setUserRol(rol);
-    const user = localStorage.getItem('usuario');
-    console.log(user);
-    if (user) {
+    if (raw) {
       try {
-        const userObject = JSON.parse(user);
-        setUserName(userObject.name || 'Usuario'); 
-        console.log('Usuario cargado:', userObject);
+        const userObject = JSON.parse(raw);
+        setUserName(userObject.name || 'Usuario');
       } catch (error) {
         console.error('Error al parsear usuario:', error);
         setUserName('Usuario');
       }
     } else {
-      console.log('No hay usuario guardado en localStorage.');
       setUserName('Invitado');
     }
   }, []);
