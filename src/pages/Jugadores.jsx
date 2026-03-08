@@ -1607,17 +1607,13 @@ const fetchCategorias = async () => {
                     </div>
 
                     {/* Contenido principal */}
-                    <div className="relative flex" style={{marginLeft: '50px', padding: '20px 30px', gap: '30px'}}>
-                      {/* Foto del jugador con borde de categoría */}
+                    <div className="relative flex" style={{marginLeft: '50px', padding: '12px 30px', gap: '24px'}}>
+                      {/* Foto del jugador */}
                       <div className="flex-shrink-0">
                         {selectedCarnet.foto_carnet ? (
                           <div
                             className="overflow-hidden shadow-xl"
-                            style={{
-                              width: '180px',
-                              height: '220px',
-                              border: `5px solid ${colorBase}`
-                            }}
+                            style={{ width: '175px', height: '205px', border: `5px solid ${colorBase}` }}
                           >
                             <img
                               src={`http://localhost:8080${selectedCarnet.foto_carnet}`}
@@ -1628,11 +1624,7 @@ const fetchCategorias = async () => {
                         ) : (
                           <div
                             className="flex items-center justify-center bg-gray-200 shadow-xl"
-                            style={{
-                              width: '180px',
-                              height: '220px',
-                              border: `5px solid ${colorBase}`
-                            }}
+                            style={{ width: '175px', height: '205px', border: `5px solid ${colorBase}` }}
                           >
                             <span className="text-gray-400" style={{fontSize: '16px'}}>Sin foto</span>
                           </div>
@@ -1640,52 +1632,39 @@ const fetchCategorias = async () => {
                       </div>
 
                       {/* Información del jugador */}
-                      <div className="flex-1" style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                        {/* Club */}
-                        {clubNombre && (
-                          <div>
-                            <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>CLUB:</p>
-                            <p className="font-bold leading-tight" style={{fontSize: '20px', color: '#000'}}>{clubNombre}</p>
-                          </div>
-                        )}
-
-                        {/* Categoría con color de fondo */}
-                        {categoriaData && (
-                          <div>
-                            <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>CATEGORÍA:</p>
-                            <div
-                              className="inline-block px-4 py-1"
-                              style={{
-                                background: colorBase,
-                                borderRadius: '4px'
-                              }}
-                            >
-                              <p className="font-black uppercase text-white" style={{fontSize: '18px'}}>{categoriaData.label}</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Rama (género) */}
-                        <div>
-                          <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>RAMA:</p>
-                          <p className="font-bold" style={{fontSize: '18px', color: '#000'}}>
-                            {categoriaData?.label?.includes('Damas') ? 'FEMENINO' : 'MASCULINO'}
-                          </p>
-                        </div>
-
+                      <div className="flex-1" style={{display: 'flex', flexDirection: 'column', gap: '7px'}}>
                         {/* Nombres */}
                         <div>
-                          <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>NOMBRES:</p>
-                          <p className="font-bold leading-tight" style={{fontSize: '18px', color: '#000'}}>{nombreCompleto.split(' ')[0]}</p>
+                          <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '1px'}}>NOMBRES:</p>
+                          <p className="font-bold leading-tight" style={{fontSize: '17px', color: '#000'}}>{personaData.nombre || '—'}</p>
                         </div>
 
                         {/* Apellidos */}
                         <div>
-                          <p className="font-bold uppercase" style={{fontSize: '14px', color: '#000', marginBottom: '4px'}}>APELLIDOS:</p>
-                          <p className="font-bold leading-tight" style={{fontSize: '18px', color: '#000'}}>
-                            {nombreCompleto.split(' ').slice(1).join(' ')}
+                          <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '1px'}}>APELLIDOS:</p>
+                          <p className="font-bold leading-tight" style={{fontSize: '17px', color: '#000'}}>
+                            {[personaData.ap, personaData.am].filter(Boolean).join(' ') || '—'}
                           </p>
                         </div>
+
+                        {/* Club */}
+                        {clubNombre && (
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '1px'}}>CLUB:</p>
+                            <p className="font-bold leading-tight" style={{fontSize: '17px', color: '#000'}}>{clubNombre}</p>
+                          </div>
+                        )}
+
+                        {/* Categoría */}
+                        {categoriaData && (
+                          <div>
+                            <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '1px'}}>CATEGORÍA:</p>
+                            <div className="inline-block px-3 py-0.5" style={{ background: colorBase, borderRadius: '4px' }}>
+                              <p className="font-black uppercase text-white" style={{fontSize: '14px'}}>{categoriaData.label}</p>
+                            </div>
+                          </div>
+                        )}
+
                       </div>
                     </div>
 
@@ -1694,43 +1673,45 @@ const fetchCategorias = async () => {
                       className="absolute bottom-0 left-0 right-0"
                       style={{
                         marginLeft: '50px',
-                        padding: '15px 30px',
+                        padding: '12px 30px',
                         background: '#f8f8f8',
                         borderTop: `4px solid ${colorBase}`
                       }}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-12">
-                          <div>
-                            <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000', marginBottom: '4px'}}>F. NACIMTO.</p>
-                            <p className="font-bold" style={{fontSize: '16px', color: '#000'}}>
-                              {new Date(selectedCarnet.fecha_solicitud).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000', marginBottom: '4px'}}>C.I.</p>
-                            <p className="font-bold" style={{fontSize: '16px', color: '#000'}}>{selectedCarnet.numero_carnet}</p>
-                          </div>
-
-                          <div>
-                            <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000', marginBottom: '4px'}}>GESTIÓN:</p>
-                            <p className="font-bold" style={{fontSize: '16px', color: '#000'}}>
-                              {new Date(selectedCarnet.fecha_vencimiento).getFullYear()}
-                            </p>
-                          </div>
+                      <div className="flex gap-10">
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '3px'}}>F. NACIMTO.</p>
+                          <p className="font-bold" style={{fontSize: '15px', color: '#000'}}>
+                            {personaData.fnac
+                              ? new Date(personaData.fnac).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                              : '—'}
+                          </p>
                         </div>
 
-                        {/* Línea de puntos para firma */}
-                        <div className="text-center">
-                          <div
-                            style={{
-                              borderBottom: '2px dotted #000',
-                              width: '180px',
-                              marginBottom: '6px'
-                            }}
-                          ></div>
-                          <p className="font-bold uppercase" style={{fontSize: '12px', color: '#000'}}>FIRMA JUGADOR</p>
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '3px'}}>C.I.</p>
+                          <p className="font-bold" style={{fontSize: '15px', color: '#000'}}>{personaData.ci || '—'}</p>
+                        </div>
+
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '3px'}}>GESTIÓN:</p>
+                          <p className="font-bold" style={{fontSize: '15px', color: '#000'}}>
+                            {selectedCarnet.gestion?.gestion || selectedCarnet.gestion?.nombre || '—'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="font-bold uppercase" style={{fontSize: '11px', color: '#555', marginBottom: '3px'}}>RAMA:</p>
+                          <p className="font-bold" style={{fontSize: '15px', color: '#000'}}>
+                            {(() => {
+                              const lbl = (categoriaData?.label || '').toLowerCase();
+                              return lbl.includes('femenino') || lbl.includes('damas') || lbl.includes('mujer')
+                                ? 'FEMENINO'
+                                : lbl.includes('masculino') || lbl.includes('varones') || lbl.includes('hombre')
+                                  ? 'MASCULINO'
+                                  : 'MIXTO';
+                            })()}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1870,6 +1851,20 @@ const fetchCategorias = async () => {
 
                   {/* Información del jugador */}
                   <div className="flex-1" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    {/* Nombres */}
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>NOMBRES:</p>
+                      <p className="font-bold leading-tight" style={{fontSize: '10px', color: '#000'}}>{personaData.nombre || '—'}</p>
+                    </div>
+
+                    {/* Apellidos */}
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>APELLIDOS:</p>
+                      <p className="font-bold leading-tight" style={{fontSize: '10px', color: '#000'}}>
+                        {[personaData.ap, personaData.am].filter(Boolean).join(' ') || '—'}
+                      </p>
+                    </div>
+
                     {/* Club */}
                     {clubNombre && (
                       <div>
@@ -1884,37 +1879,13 @@ const fetchCategorias = async () => {
                         <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>CATEGORÍA:</p>
                         <div
                           className="inline-block px-2 py-0.5"
-                          style={{
-                            background: colorBase,
-                            borderRadius: '2px'
-                          }}
+                          style={{ background: colorBase, borderRadius: '2px' }}
                         >
                           <p className="font-black uppercase text-white" style={{fontSize: '10px'}}>{categoriaData.label}</p>
                         </div>
                       </div>
                     )}
 
-                    {/* Rama (género) */}
-                    <div>
-                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>RAMA:</p>
-                      <p className="font-bold" style={{fontSize: '10px', color: '#000'}}>
-                        {categoriaData?.label?.includes('Damas') ? 'FEMENINO' : 'MASCULINO'}
-                      </p>
-                    </div>
-
-                    {/* Nombres */}
-                    <div>
-                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>NOMBRES:</p>
-                      <p className="font-bold leading-tight" style={{fontSize: '10px', color: '#000'}}>{nombreCompleto.split(' ')[0]}</p>
-                    </div>
-
-                    {/* Apellidos */}
-                    <div>
-                      <p className="font-bold uppercase" style={{fontSize: '7px', color: '#000', marginBottom: '1px'}}>APELLIDOS:</p>
-                      <p className="font-bold leading-tight" style={{fontSize: '10px', color: '#000'}}>
-                        {nombreCompleto.split(' ').slice(1).join(' ')}
-                      </p>
-                    </div>
                   </div>
                 </div>
 
@@ -1928,38 +1899,40 @@ const fetchCategorias = async () => {
                     borderTop: `2px solid ${colorBase}`
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-6">
-                      <div>
-                        <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000', marginBottom: '1px'}}>F. NACIMTO.</p>
-                        <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
-                          {new Date(selectedCarnet.fecha_solicitud).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000', marginBottom: '1px'}}>C.I.</p>
-                        <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>{selectedCarnet.numero_carnet}</p>
-                      </div>
-
-                      <div>
-                        <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000', marginBottom: '1px'}}>GESTIÓN:</p>
-                        <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
-                          {new Date(selectedCarnet.fecha_vencimiento).getFullYear()}
-                        </p>
-                      </div>
+                  <div className="flex gap-5">
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '6px', color: '#555', marginBottom: '1px'}}>F. NACIMTO.</p>
+                      <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
+                        {personaData.fnac
+                          ? new Date(personaData.fnac).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                          : '—'}
+                      </p>
                     </div>
 
-                    {/* Línea de puntos para firma */}
-                    <div className="text-center">
-                      <div
-                        style={{
-                          borderBottom: '1px dotted #000',
-                          width: '80px',
-                          marginBottom: '2px'
-                        }}
-                      ></div>
-                      <p className="font-bold uppercase" style={{fontSize: '6px', color: '#000'}}>FIRMA JUGADOR</p>
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '6px', color: '#555', marginBottom: '1px'}}>C.I.</p>
+                      <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>{personaData.ci || '—'}</p>
+                    </div>
+
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '6px', color: '#555', marginBottom: '1px'}}>GESTIÓN:</p>
+                      <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
+                        {selectedCarnet.gestion?.gestion || selectedCarnet.gestion?.nombre || '—'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="font-bold uppercase" style={{fontSize: '6px', color: '#555', marginBottom: '1px'}}>RAMA:</p>
+                      <p className="font-bold" style={{fontSize: '8px', color: '#000'}}>
+                        {(() => {
+                          const lbl = (categoriaData?.label || '').toLowerCase();
+                          return lbl.includes('femenino') || lbl.includes('damas') || lbl.includes('mujer')
+                            ? 'FEMENINO'
+                            : lbl.includes('masculino') || lbl.includes('varones') || lbl.includes('hombre')
+                              ? 'MASCULINO'
+                              : 'MIXTO';
+                        })()}
+                      </p>
                     </div>
                   </div>
                 </div>
