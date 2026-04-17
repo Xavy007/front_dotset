@@ -5,9 +5,8 @@ import { campeonatoService } from '../services/campeonatoService';
 import { categoriaService } from '../services/categoriaService';
 import { fixtureService } from '../services/fixtureService';
 import ModalAsignarRecursos from '../components/ModalAsignarRecursos';
-
-// URL del servidor para archivos estáticos (logos, imágenes)
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
+import { toast } from 'sonner';
+import { SERVER_URL } from '../services/api.config';
 
 export default function GestionPartidos() {
   const [campeonatos, setCampeonatos] = useState([]);
@@ -100,10 +99,10 @@ export default function GestionPartidos() {
       if (response.success) {
         setShowModalAsignar(false);
         cargarFixture(); // Recargar para mostrar cambios
-        alert('✅ Partido actualizado exitosamente');
+        toast.success('Partido actualizado exitosamente');
       }
     } catch (error) {
-      alert('❌ Error al actualizar partido: ' + error.message);
+      toast.error('Error al actualizar partido: ' + error.message);
     }
   };
 

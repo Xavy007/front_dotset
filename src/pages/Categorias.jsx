@@ -5,10 +5,15 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Search, AlertCircle, Pencil, Power, Trash2
+  Plus, Search, AlertCircle, Pencil, Power, Trash2, Tag, CheckCircle, XCircle, Users
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+import PageHeader from '../components/PageHeader';
+import StatCard, { StatsRow } from '../components/StatCard';
+import ConfirmModal from '../components/ConfirmModal';
+import { API_BASE } from '../services/api.config.js';
 
 export function CategoriasPage() {
   const [categorias, setCategorias] = useState([]);
@@ -18,13 +23,14 @@ export function CategoriasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedColor, setSelectedColor] = useState('#3B82F6');
+  const [confirm, setConfirm] = useState({ open: false, id: null, type: null, cat: null });
   
   // NUEVOS ESTADOS PARA MÚLTIPLES GÉNEROS
   const [generosSeleccionados, setGenerosSeleccionados] = useState([]);
   const [creatingMultiple, setCreatingMultiple] = useState(false);
   const [progreso, setProgreso] = useState({ actual: 0, total: 0 });
 
-  const API_URL = 'http://localhost:8080/api/categoria';
+  const API_URL = `${API_BASE}/categoria`;
 
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');
@@ -113,17 +119,17 @@ const handleSubmit = async (formData) => {
       setIsModalOpen(false);
       setEditingCategoria(null);
       setSelectedColor('#3B82F6');
-      alert('Categoría actualizada correctamente');
+      toast.success('Categoría actualizada correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
     return;
   }
 
   // Si está CREANDO: verificar géneros seleccionados
   if (generosSeleccionados.length === 0) {
-    alert('⚠️ Debes seleccionar al menos un género');
+    toast.warning('Debes seleccionar al menos un género');
     return;
   }
 
@@ -186,16 +192,19 @@ const handleSubmit = async (formData) => {
 
   // Mostrar resultado
   if (errores.length === 0) {
-    alert(`✅ ${resultados.length} categoría(s) creadas correctamente:\n\n${resultados.map(r => `• ${r}`).join('\n')}`);
+    toast.success(`${resultados.length} categoría(s) creadas correctamente: ${resultados.join(', ')}`);
   } else {
-    alert(`⚠️ Creadas: ${resultados.length}\n❌ Errores: ${errores.length}\n\n${errores.map(e => `${e.genero}: ${e.error}`).join('\n')}`);
+    toast.warning(`Creadas: ${resultados.length} | Errores: ${errores.length} — ${errores.map(e => `${e.genero}: ${e.error}`).join(', ')}`);
   }
 };
 
 
   // ELIMINAR CATEGORÍA
-  const handleDelete = async (id_categoria) => {
-    if (!window.confirm('¿Estás seguro que deseas eliminar esta categoría?')) return;
+  const handleDelete = (id_categoria) => {
+    setConfirm({ open: true, id: id_categoria, type: 'delete', cat: null });
+  };
+
+  const doDelete = async (id_categoria) => {
     try {
       const res = await fetch(`${API_URL}/${id_categoria}`, {
         method: 'DELETE',
@@ -203,18 +212,20 @@ const handleSubmit = async (formData) => {
       });
       if (!res.ok) throw new Error('Error al eliminar la categoría');
       setCategorias(prev => prev.filter(c => c.id_categoria !== id_categoria));
-      alert('Categoría eliminada correctamente');
+      toast.success('Categoría eliminada correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
   // CAMBIAR ESTADO (ACTIVA/INACTIVA)
-  const toggleEstado = async (cat) => {
-    const nuevoEstado = !cat.estadoBooleano;
-    if (!window.confirm(`¿Deseas ${nuevoEstado ? 'activar' : 'desactivar'} esta categoría?`)) return;
+  const toggleEstado = (cat) => {
+    setConfirm({ open: true, id: cat.id_categoria, type: 'toggle', cat });
+  };
 
+  const doToggleEstado = async (cat) => {
+    const nuevoEstado = !cat.estadoBooleano;
     try {
       const res = await fetch(`${API_URL}/${cat.id_categoria}/estado`, {
         method: 'PUT',
@@ -233,7 +244,7 @@ const handleSubmit = async (formData) => {
       );
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -523,84 +534,92 @@ const handleSubmit = async (formData) => {
           <span className="font-medium">Este color identificará la categoría en carnets, tablas y reportes</span>
         </div>
       ),
-      renderCustom: () => (
-        <div className="space-y-4">
-          {/* Selector de color visual */}
-          <div className="bg-gradient-to-br from-gray-50 to-white p-5 rounded-xl border-2 border-gray-200 shadow-sm">
-            <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">
-              Selecciona un color
-            </p>
+      renderCustom: (formData, handleFieldChange) => {
+        const colorActual = formData?.color || selectedColor || '#3B82F6';
+        const setColor = (val) => {
+          setSelectedColor(val);
+          handleFieldChange('color', val);
+        };
+        return (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-br from-gray-50 to-white p-5 rounded-xl border-2 border-gray-200 shadow-sm">
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">
+                Selecciona un color
+              </p>
 
-            {/* Grid de colores predefinidos */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              {colorPresets.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => setSelectedColor(preset.value)}
-                  className={`group relative h-16 rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg ${
-                    selectedColor === preset.value 
-                      ? 'ring-4 ring-blue-500 ring-offset-2 scale-105 shadow-xl' 
-                      : 'border-3 border-gray-300 hover:border-gray-400 shadow-md'
-                  }`}
-                  style={{ backgroundColor: preset.value }}
-                  title={preset.name}
-                >
-                  {/* Checkmark cuando está seleccionado */}
-                  {selectedColor === preset.value && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <svg className="w-8 h-8 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  )}
-
-                  {/* Tooltip al hover */}
-                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {preset.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Color picker + Input HEX */}
-            <div className="flex items-center gap-3 pt-3 border-t-2 border-gray-200">
-              <div className="relative">
-                <input
-                  type="color"
-                  value={selectedColor}
-                  onChange={(e) => setSelectedColor(e.target.value)}
-                  className="w-14 h-14 rounded-lg cursor-pointer border-2 border-gray-300 shadow-md hover:shadow-lg transition-shadow"
-                  title="Selector de color personalizado"
-                />
+              {/* Grid de colores predefinidos */}
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                {colorPresets.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setColor(preset.value)}
+                    className={`group relative h-16 rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg ${
+                      colorActual === preset.value
+                        ? 'ring-4 ring-blue-500 ring-offset-2 scale-105 shadow-xl'
+                        : 'border-2 border-gray-300 hover:border-gray-400 shadow-md'
+                    }`}
+                    style={{ backgroundColor: preset.value }}
+                    title={preset.name}
+                  >
+                    {colorActual === preset.value && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {preset.name}
+                    </span>
+                  </button>
+                ))}
               </div>
 
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={selectedColor}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
-                      setSelectedColor(value);
-                    }
-                  }}
-                  placeholder="#000000"
-                  maxLength={7}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-mono text-base font-bold text-gray-800 uppercase focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
-                />
-              </div>
+              {/* Color picker personalizado + Input HEX */}
+              <div className="flex items-center gap-3 pt-3 border-t-2 border-gray-200">
+                <div className="relative flex flex-col items-center gap-1">
+                  <input
+                    type="color"
+                    value={colorActual}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    title="Abrir selector de color"
+                  />
+                  <div className="w-20 h-14 rounded-lg border-2 border-dashed border-blue-400 bg-blue-50 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-blue-100 transition-colors">
+                    <span className="text-xl">🎨</span>
+                    <span className="text-xs font-bold text-blue-600">Elegir color</span>
+                  </div>
+                </div>
 
-              {/* Preview del color seleccionado */}
-              <div 
-                className="w-14 h-14 rounded-lg border-2 border-gray-300 shadow-md"
-                style={{ backgroundColor: selectedColor }}
-                title="Vista previa"
-              />
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Código HEX</label>
+                  <input
+                    type="text"
+                    value={colorActual}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) setColor(val);
+                    }}
+                    placeholder="#000000"
+                    maxLength={7}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-mono text-base font-bold text-gray-800 uppercase focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                  />
+                </div>
+
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className="w-14 h-14 rounded-lg border-2 border-gray-300 shadow-md"
+                    style={{ backgroundColor: colorActual }}
+                    title="Vista previa"
+                  />
+                  <span className="text-xs text-gray-500 font-medium">Vista previa</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )
+        );
+      }
     }
   ];
 
@@ -614,10 +633,12 @@ const handleSubmit = async (formData) => {
   // RENDER
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">🏆 Categorías</h1>
-        <p className="text-gray-600 mt-2">Administra las categorías registradas en el sistema.</p>
-      </div>
+      <PageHeader
+        icon={Tag}
+        title="Categorías"
+        subtitle="Administra las categorías registradas en el sistema."
+        action={{ label: 'Nueva Categoría', icon: Plus, onClick: () => { setEditingCategoria(null); setSelectedColor('#3B82F6'); setGenerosSeleccionados([]); setIsModalOpen(true); } }}
+      />
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3 items-center">
@@ -637,56 +658,23 @@ const handleSubmit = async (formData) => {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button
-          onClick={() => { 
-            setEditingCategoria(null); 
-            setSelectedColor('#3B82F6');
-            setGenerosSeleccionados([]);
-            setIsModalOpen(true); 
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg"
-        >
-          <Plus size={20} /> Nueva Categoría
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm">Total Categorías</p>
-          <p className="text-2xl font-bold text-gray-900">{categorias.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm">Activas</p>
-          <p className="text-2xl font-bold text-green-600">{totalActivas}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-red-500">
-          <p className="text-gray-600 text-sm">Inactivas</p>
-          <p className="text-2xl font-bold text-red-600">{totalInactivas}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-400">
-          <p className="text-gray-600 text-sm">Masculinas</p>
-          <p className="text-2xl font-bold text-blue-500">{totalMasculinas}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-pink-400">
-          <p className="text-gray-600 text-sm">Femeninas / Mixtas</p>
-          <p className="text-2xl font-bold text-pink-500">{totalFemeninas + totalMixtas}</p>
-        </div>
-      </div>
+      <StatsRow cols={5}>
+        <StatCard title="Total Categorías" value={categorias.length} icon={Tag} color="blue" loading={loading} />
+        <StatCard title="Activas" value={totalActivas} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard title="Inactivas" value={totalInactivas} icon={XCircle} color="red" loading={loading} />
+        <StatCard title="Masculinas" value={totalMasculinas} icon={Users} color="blue" loading={loading} />
+        <StatCard title="Femeninas / Mixtas" value={totalFemeninas + totalMixtas} icon={Users} color="purple" loading={loading} />
+      </StatsRow>
 
-      {loading ? (
-        <div className="bg-white rounded-lg p-6 text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-gray-200 border-t-blue-500 mx-auto rounded-full"></div>
-          <p className="mt-3 text-gray-600">Cargando categorías...</p>
-        </div>
-      ) : (
-        <DataTable data={filteredCategorias} columns={columns} itemsPerPage={5} />
-      )}
+      <DataTable data={filteredCategorias} columns={columns} itemsPerPage={5} loading={loading} />
 
       <FormModal
         isOpen={isModalOpen}
-        onClose={() => { 
-          setIsModalOpen(false); 
-          setEditingCategoria(null); 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingCategoria(null);
           setSelectedColor('#3B82F6');
           setGenerosSeleccionados([]);
         }}
@@ -695,6 +683,20 @@ const handleSubmit = async (formData) => {
         fields={formFields}
         initialData={editingCategoria || {}}
         size="3xl"
+      />
+
+      <ConfirmModal
+        isOpen={confirm.open}
+        onClose={() => setConfirm({ open: false, id: null, type: null, cat: null })}
+        onConfirm={() => {
+          if (confirm.type === 'delete') doDelete(confirm.id);
+          if (confirm.type === 'toggle') doToggleEstado(confirm.cat);
+        }}
+        title={confirm.type === 'toggle'
+          ? `¿${confirm.cat && !confirm.cat.estadoBooleano ? 'Activar' : 'Desactivar'} Categoría?`
+          : '¿Eliminar Categoría?'}
+        message="Esta acción no se puede deshacer."
+        confirmText={confirm.type === 'toggle' ? 'Confirmar' : 'Eliminar'}
       />
     </div>
   );

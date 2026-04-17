@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { API_BASE } from '../services/api.config';
 
 export function PlanillaPartido() {
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ export function PlanillaPartido() {
     }));
   }
 
-  const API_URL_PARTIDO = 'http://localhost:8080/api/partidos';
+  const API_URL_PARTIDO = `${API_BASE}/partidos`;
 
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');

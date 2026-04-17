@@ -4,7 +4,8 @@
 // ===============================================
 
 // URL base de la API desde variables de entorno
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+export const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
 
 // Timeout para las peticiones
 export const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 10000;

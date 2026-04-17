@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 import { categoriaService } from '../services/categoriaService';
+import { toast } from 'sonner';
 
 export default function ModalCategoriaCampeonato({ isOpen, onClose, campeonato, onSave }) {
   const [categorias, setCategorias] = useState([]);
@@ -35,7 +36,7 @@ export default function ModalCategoriaCampeonato({ isOpen, onClose, campeonato, 
       }
     } catch (error) {
       console.error('Error al cargar categorías:', error);
-      alert('Error al cargar las categorías: ' + error.message);
+      toast.error('Error al cargar las categorías: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export default function ModalCategoriaCampeonato({ isOpen, onClose, campeonato, 
 
   const handleSave = async () => {
     if (selectedCategorias.length === 0) {
-      alert('Debes seleccionar al menos una categoría');
+      toast.warning('Debes seleccionar al menos una categoría');
       return;
     }
 
@@ -131,7 +132,7 @@ export default function ModalCategoriaCampeonato({ isOpen, onClose, campeonato, 
       onClose();
     } catch (error) {
       console.error('Error al guardar categorías:', error);
-      alert(`Error al guardar: ${error.message}`);
+      toast.error(`Error al guardar: ${error.message}`);
     } finally {
       setSaving(false);
     }

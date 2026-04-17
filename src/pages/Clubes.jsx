@@ -4,12 +4,17 @@
 // ===============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import {
   Users, Plus, Search, AlertCircle,
-  Pencil, Globe, Mail, Phone, Power, Trash2, Shield, X
+  Pencil, Globe, Mail, Phone, Power, Trash2, Shield, X, CheckCircle, FileCheck
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import PageHeader from '../components/PageHeader';
+import StatCard, { StatsRow } from '../components/StatCard';
+import ConfirmModal from '../components/ConfirmModal';
+import { API_BASE, SERVER_URL } from '../services/api.config.js';
 
 export function ClubesPage() {
   const [clubes, setClubes] = useState([]);
@@ -19,8 +24,9 @@ export function ClubesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null); // ← Para preview de imagen
+  const [confirm, setConfirm] = useState({ open: false, id: null });
 
-  const API_URL = 'http://localhost:8080/api/club';
+  const API_URL = `${API_BASE}/club`;
 
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');
@@ -196,10 +202,10 @@ export function ClubesPage() {
       setIsModalOpen(false);
       setEditingClub(null);
       setPreviewUrl(null);
-      alert('Club guardado correctamente');
+      toast.success('Club guardado correctamente');
     } catch (err) {
       console.error('❌ Error completo:', err);
-      alert(`Error: ${err.message}`);
+      toast.error(err.message);
     }
   };
 
@@ -208,7 +214,6 @@ export function ClubesPage() {
   // ===============================================
   const toggleEstado = async (club) => {
     const nuevoEstado = !club.estadoBooleano;
-    if (!window.confirm(`¿Deseas ${nuevoEstado ? 'activar' : 'desactivar'} este club?`)) return;
 
     try {
       const res = await fetch(`${API_URL}/${club.id_club}/estado`, {
@@ -230,18 +235,21 @@ export function ClubesPage() {
         )
       );
       
-      alert(`Club ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`);
+      toast.success(`Club ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`);
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
   // ===============================================
   // ELIMINAR CLUB
   // ===============================================
-  const handleDelete = async (id_club) => {
-    if (!window.confirm('¿Estás seguro que deseas eliminar este club?')) return;
+  const handleDelete = (id_club) => {
+    setConfirm({ open: true, id: id_club });
+  };
+
+  const doDelete = async (id_club) => {
     try {
       const res = await fetch(`${API_URL}/${id_club}`, {
         method: 'DELETE',
@@ -249,10 +257,10 @@ export function ClubesPage() {
       });
       if (!res.ok) throw new Error('Error al eliminar el club');
       setClubes(prev => prev.filter(c => c.id_club !== id_club));
-      alert('Club eliminado correctamente');
+      toast.success('Club eliminado correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -304,9 +312,9 @@ export function ClubesPage() {
     }
     
     // Construir URL correcta
-    const imageUrl = value.startsWith('http') 
-      ? value 
-      : `http://localhost:8080${value.startsWith('/') ? value : '/' + value}`;
+    const imageUrl = value.startsWith('http')
+      ? value
+      : `${SERVER_URL}${value.startsWith('/') ? value : '/' + value}`;
     
     console.log('🖼️ Image URL:', imageUrl); // ← AGREGAR para debug
     
@@ -515,10 +523,12 @@ export function ClubesPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">🏟️ Clubes</h1>
-        <p className="text-gray-600 mt-2">Administra los clubes registrados en el sistema.</p>
-      </div>
+      <PageHeader
+        icon={Shield}
+        title="Clubes"
+        subtitle="Administra los clubes registrados en el sistema."
+        action={{ label: 'Nuevo Club', icon: Plus, onClick: () => { setEditingClub(null); setPreviewUrl(null); setIsModalOpen(true); } }}
+      />
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3 items-center">
@@ -538,47 +548,21 @@ export function ClubesPage() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button
-          onClick={() => { 
-            setEditingClub(null); 
-            setPreviewUrl(null);
-            setIsModalOpen(true); 
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus size={20} /> Nuevo Club
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm">Total Clubes</p>
-          <p className="text-2xl font-bold text-gray-900">{clubes.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm">Activos</p>
-          <p className="text-2xl font-bold text-green-600">{totalActivos}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
-          <p className="text-gray-600 text-sm">Con Personería Jurídica</p>
-          <p className="text-2xl font-bold text-yellow-600">{totalPersoneria}</p>
-        </div>
-      </div>
+      <StatsRow cols={3}>
+        <StatCard title="Total Clubes" value={clubes.length} icon={Shield} color="blue" loading={loading} />
+        <StatCard title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard title="Con Personería Jurídica" value={totalPersoneria} icon={FileCheck} color="yellow" loading={loading} />
+      </StatsRow>
 
-      {loading ? (
-        <div className="bg-white rounded-lg p-6 text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-gray-200 border-t-blue-500 mx-auto rounded-full"></div>
-          <p className="mt-3 text-gray-600">Cargando clubes...</p>
-        </div>
-      ) : (
-        <DataTable data={filteredClubes} columns={columns} itemsPerPage={5} />
-      )}
+      <DataTable data={filteredClubes} columns={columns} itemsPerPage={5} loading={loading} />
 
       <FormModal
         isOpen={isModalOpen}
-        onClose={() => { 
-          setIsModalOpen(false); 
-          setEditingClub(null); 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingClub(null);
           setPreviewUrl(null);
         }}
         onSubmit={handleSubmit}
@@ -586,6 +570,15 @@ export function ClubesPage() {
         size="4xl"
         fields={formFields}
         initialData={editingClub || {}}
+      />
+
+      <ConfirmModal
+        isOpen={confirm.open}
+        onClose={() => setConfirm({ open: false, id: null })}
+        onConfirm={() => doDelete(confirm.id)}
+        title="¿Eliminar Club?"
+        message="Esta acción no se puede deshacer."
+        confirmText="Eliminar"
       />
     </div>
   );

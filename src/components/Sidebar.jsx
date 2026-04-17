@@ -12,17 +12,18 @@ import {
   UserRoundCog,
   TrendingUp,
   Volleyball,
-  VolleyballIcon,
+  Shield,
   Trophy,
   MapIcon,
   Activity,
-  Settings,
   LogOut,
   FileText,
   Calendar,
   CalendarCog,
+  CalendarRange,
   UserPlus,
-  Medal
+  Medal,
+  Building2
 } from 'lucide-react';
 import { LogoutModal } from '../utils/LogoutModal';
 import { handleLogout } from '../utils/auth';
@@ -48,9 +49,9 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         page: 'usuarios',
         module: 'usuarios'
       },
-      { 
-        label: 'Gestiones', 
-        icon: User, 
+      {
+        label: 'Gestiones',
+        icon: CalendarRange,
         page: 'gestiones',
         module: 'gestiones'
       },
@@ -85,9 +86,9 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         page: 'club',
         module: 'club'
       },
-      { 
-        label: 'Equipos', 
-        icon: VolleyballIcon, 
+      {
+        label: 'Equipos',
+        icon: Shield,
         page: 'equipos',
         module: 'equipos'
       },
@@ -116,10 +117,10 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         module: 'campeonatos' // Mismo permiso que campeonatos
       },
       {
-        label: 'Partidos',
+        label: 'Prog. Partidos',
         icon: CalendarCog,
         page: 'gestion-partidos',
-        module: 'partidos' // Mismo permiso que partidos
+        module: 'partidos'
       },
       {
         label: 'Inscripciones',
@@ -132,6 +133,12 @@ export function Sidebar({ isOpen, currentPage, onPageChange, userRol, usuario, c
         icon: FileText,
         page: 'reportes',
         module: 'reportes'
+      },
+      {
+        label: 'Asociación',
+        icon: Building2,
+        page: 'asociacion',
+        module: 'asociacion'
       },
       {
         label: 'Posiciones',

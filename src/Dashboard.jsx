@@ -24,8 +24,9 @@ import { GestionesPage } from './pages/Gestiones';
 import GenerarFixture from './pages/GenerarFixture';
 import GestionPartidos from './pages/GestionPartidos';
 import GestionInscripciones from './pages/GestionInscripciones';
-import { PlanillaFIVB } from './pages/PlanillaFIVB'; // Planilla FIVB con carga de MongoDB
+import { PlanillaFIVB } from './pages/PlanillaFIVB';
 import { TablaPosicionesPage } from './pages/TablaPosiciones';
+import { AsociacionPage } from './pages/Asociacion';
 
 
 // ================================================
@@ -124,6 +125,8 @@ export default function Dashboard() {
         return <PlanillaFIVB />;
       case 'tabla-posiciones':
         return <TablaPosicionesPage />;
+      case 'asociacion':
+        return <AsociacionPage />;
 
       default:
         return <DashboardPage />;

@@ -33,6 +33,7 @@ import { campeonatoService } from '../services/campeonatoService';
 import { equipoService } from '../services/equipoService';
 import { categoriaService } from '../services/categoriaService';
 import { inscripcionService } from '../services/inscripcionService';
+import { toast } from 'sonner';
 
 /* ═══════════════════════════════════════════════════════════════════
    SECCIÓN: Recursos estáticos
@@ -456,7 +457,7 @@ export function CampeonatosPage() {
         await cargarCampeonatos();
       } catch (err) {
         console.error('Error al eliminar campeonato:', err);
-        alert(`Error al eliminar: ${err.message}`);
+        toast.error(`Error al eliminar: ${err.message}`);
       }
     }
   };
@@ -515,7 +516,7 @@ export function CampeonatosPage() {
       setEditingCampeonato(null);
     } catch (err) {
       console.error('Error al guardar campeonato:', err);
-      alert(`Error al guardar: ${err.message}`);
+      toast.error(`Error al guardar: ${err.message}`);
     }
   };
 
@@ -619,10 +620,10 @@ export function CampeonatosPage() {
       ));
 
       setShowFormatModal(false);
-      alert('✅ Configuración guardada exitosamente');
+      toast.success('Configuración guardada exitosamente');
     } catch (error) {
       console.error('Error al guardar configuración:', error);
-      alert('❌ Error al guardar la configuración: ' + error.message);
+      toast.error('Error al guardar la configuración: ' + error.message);
     }
   };
 
@@ -721,7 +722,7 @@ export function CampeonatosPage() {
     const equiposDisponibles = getEquiposDisponiblesPorCategoria(formatConfig.categoriaSeleccionada);
     
     if (equiposDisponibles.length === 0) {
-      alert('No hay equipos disponibles para distribuir en esta categoría.');
+      toast.warning('No hay equipos disponibles para distribuir en esta categoría.');
       return;
     }
 
@@ -1498,7 +1499,7 @@ export function CampeonatosPage() {
                               const equiposDisponibles = getEquiposDisponiblesPorCategoria(formatConfig.categoriaSeleccionada);
                               
                               if (equiposDisponibles.length === 0) {
-                                alert('No hay equipos disponibles. Primero asigna equipos a esta fase.');
+                                toast.warning('No hay equipos disponibles. Primero asigna equipos a esta fase.');
                                 return;
                               }
 

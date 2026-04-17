@@ -2,7 +2,7 @@
 // ARCHIVO: src/services/inscripcionService.js
 // ===============================================
 
-const API_BASE = 'http://localhost:8080/api';
+import { API_BASE } from './api.config.js';
 
 // Función genérica para manejar respuestas
 async function request(url, options = {}) {

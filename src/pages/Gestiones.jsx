@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+import { API_BASE } from '../services/api.config.js';
 
 export function GestionesPage() {
   const [gestiones, setGestiones] = useState([]);
@@ -14,7 +16,7 @@ export function GestionesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_URL = 'http://localhost:8080/api/gestion';
+  const API_URL = `${API_BASE}/gestion`;
 
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');
@@ -73,10 +75,10 @@ export function GestionesPage() {
       await fetchGestiones();
       setIsModalOpen(false);
       setEditingGestion(null);
-      alert('Gestión guardada correctamente');
+      toast.success('Gestión guardada correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -98,7 +100,7 @@ export function GestionesPage() {
       );
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -111,10 +113,10 @@ export function GestionesPage() {
       });
       if (!res.ok) throw new Error('Error al eliminar la gestión');
       setGestiones(prev => prev.filter(g => g.id_gestion !== id_gestion));
-      alert('Gestión eliminada correctamente');
+      toast.success('Gestión eliminada correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -248,14 +250,7 @@ export function GestionesPage() {
           <p className="text-2xl font-bold text-red-600">{totalInactivas}</p>
         </div>
       </div>
-      {loading ? (
-        <div className="bg-white rounded-lg p-6 text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-gray-200 border-t-blue-500 mx-auto rounded-full"></div>
-          <p className="mt-3 text-gray-600">Cargando gestiones...</p>
-        </div>
-      ) : (
-        <DataTable data={filteredGestiones} columns={columns} itemsPerPage={5} />
-      )}
+      <DataTable data={filteredGestiones} columns={columns} itemsPerPage={5} loading={loading} />
       <FormModal
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingGestion(null); }}

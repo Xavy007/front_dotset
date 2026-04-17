@@ -4,9 +4,8 @@ import { useState, useEffect } from 'react';
 import { campeonatoService } from '../services/campeonatoService';
 import { categoriaService } from '../services/categoriaService';
 import { fixtureService } from '../services/fixtureService';
-
-// URL del servidor para archivos estáticos (logos, imágenes)
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
+import { toast } from 'sonner';
+import { SERVER_URL } from '../services/api.config';
 
 export default function GenerarFixture() {
   // Estados para selección de campeonato
@@ -140,7 +139,7 @@ export default function GenerarFixture() {
       });
 
       if (response.success) {
-        alert(`✅ ${response.data.partidos_creados} partidos guardados exitosamente`);
+        toast.success(`${response.data.partidos_creados} partidos guardados exitosamente`);
         setPaso(3); // Ir a asignación de recursos (ahora es paso 3, no 4)
         cargarRecursos();
       }

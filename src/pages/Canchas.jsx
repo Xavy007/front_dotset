@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+import { API_BASE } from '../services/api.config.js';
 
 export function CanchasPage() {
   const [canchas, setCanchas] = useState([]);
@@ -19,7 +21,7 @@ export function CanchasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_URL = 'http://localhost:8080/api/cancha';
+  const API_URL = `${API_BASE}/cancha`;
 
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');
@@ -102,10 +104,10 @@ export function CanchasPage() {
       await fetchCanchas();
       setIsModalOpen(false);
       setEditingCancha(null);
-      alert('Cancha guardada correctamente');
+      toast.success('Cancha guardada correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -133,7 +135,7 @@ export function CanchasPage() {
       );
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -149,10 +151,10 @@ export function CanchasPage() {
       });
       if (!res.ok) throw new Error('Error al eliminar la cancha');
       setCanchas(prev => prev.filter(c => c.id_cancha !== id_cancha));
-      alert('Cancha eliminada correctamente');
+      toast.success('Cancha eliminada correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -398,14 +400,7 @@ export function CanchasPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-lg p-6 text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-gray-200 border-t-blue-500 mx-auto rounded-full"></div>
-          <p className="mt-3 text-gray-600">Cargando canchas...</p>
-        </div>
-      ) : (
-        <DataTable data={filteredCanchas} columns={columns} itemsPerPage={5} />
-      )}
+      <DataTable data={filteredCanchas} columns={columns} itemsPerPage={5} loading={loading} />
 
       <FormModal
         isOpen={isModalOpen}

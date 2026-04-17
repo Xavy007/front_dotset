@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { API_BASE } from '../services/api.config';
 
 export default function InscripcionParticipacionModal({
   isOpen,
@@ -34,7 +36,7 @@ export default function InscripcionParticipacionModal({
 
   const fetchCampeonatos = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/campeonato');
+      const res = await fetch(`${API_BASE}/campeonato`);
       if (!res.ok) throw new Error('Error cargando campeonatos');
       const data = await res.json();
 
@@ -49,7 +51,7 @@ export default function InscripcionParticipacionModal({
   const fetchEquipos = async (id_categoria, id_campeonato) => {
     try {
       const res = await fetch(
-        `http://localhost:8080/api/equipos?id_categoria=${id_categoria}&id_campeonato=${id_campeonato}`
+        `${API_BASE}/equipos?id_categoria=${id_categoria}&id_campeonato=${id_campeonato}`
       );
       if (!res.ok) throw new Error('Error cargando equipos');
       const data = await res.json();
@@ -64,7 +66,7 @@ export default function InscripcionParticipacionModal({
   // ✅ NUEVA FUNCIÓN: Obtener CampeonatoCategorias para obtener id_cc
   const fetchCampeonatoCategorias = async (id_campeonato) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/campeonato-categoria/campeonato/${id_campeonato}`);
+      const res = await fetch(`${API_BASE}/campeonato-categoria/campeonato/${id_campeonato}`);
       if (!res.ok) throw new Error('Error cargando categorías del campeonato');
       const data = await res.json();
 
@@ -186,7 +188,7 @@ export default function InscripcionParticipacionModal({
           posicion: inscripcion.posicion
         });
 
-        return fetch('http://localhost:8080/api/participaciones', {
+        return fetch(`${API_BASE}/participaciones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -207,7 +209,7 @@ export default function InscripcionParticipacionModal({
 
       const resultados = await Promise.all(promesas);
       
-      alert(`✅ ${resultados.length} inscripción(es) creada(s) exitosamente`);
+      toast.success(`${resultados.length} inscripción(es) creada(s) exitosamente`);
       onSuccess();
       handleClose();
     } catch (error) {

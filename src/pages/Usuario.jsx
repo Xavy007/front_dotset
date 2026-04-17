@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+import { API_BASE } from '../services/api.config';
 
 export function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
@@ -36,13 +38,13 @@ export function UsuariosPage() {
   const [isClubModalOpen, setIsClubModalOpen] = useState(false);
   const [usuarioClub, setUsuarioClub] = useState(null);
 
-  const API_URL = 'http://localhost:8080/api/usuario';
-  const API_URLPersona = 'http://localhost:8080/api/persona';
-  const API_URLNacionalidad = 'http://localhost:8080/api/nacionalidad/';
-  const API_URLDepartamento = 'http://localhost:8080/api/departamentos';
-  const API_URLProvincia = 'http://localhost:8080/api/provincias';
-  const API_URL_CLUB = 'http://localhost:8080/api/club'; // 👉 NUEVO, ajusta si es distinto
-  const API_URL_c = 'http://localhost:8080/api';
+  const API_URL = `${API_BASE}/usuario`;
+  const API_URLPersona = `${API_BASE}/persona`;
+  const API_URLNacionalidad = `${API_BASE}/nacionalidad/`;
+  const API_URLDepartamento = `${API_BASE}/departamentos`;
+  const API_URLProvincia = `${API_BASE}/provincias`;
+  const API_URL_CLUB = `${API_BASE}/club`; // 👉 NUEVO, ajusta si es distinto
+  const API_URL_c = API_BASE;
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');
     return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
@@ -346,7 +348,7 @@ export function UsuariosPage() {
       setIsPersonaModalOpen(true);
     } catch (err) {
       console.error('❌ Error al cargar usuario:', err);
-      alert(err.message || 'Error al cargar los datos del usuario');
+      toast.error(err.message || 'Error al cargar los datos del usuario');
     } finally {
       setLoading(false);
     }
@@ -391,9 +393,9 @@ export function UsuariosPage() {
           : u
       ));
 
-      alert(`Usuario ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} correctamente`);
+      toast.success(`Usuario ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} correctamente`);
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
@@ -404,7 +406,7 @@ export function UsuariosPage() {
       if (!response.ok) throw new Error('Error al eliminar');
       setUsuarios(prev => prev.filter(u => u.id !== id));
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
@@ -459,9 +461,9 @@ export function UsuariosPage() {
 
       setIsCreateModalOpen(false);
       await fetchUsuarios();
-      alert('Usuario creado exitosamente');
+      toast.success('Usuario creado exitosamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -494,9 +496,9 @@ export function UsuariosPage() {
       setIsPersonaModalOpen(false);
       setEditingUsuario(null);
       await fetchUsuarios();
-      alert('Datos personales actualizados correctamente');
+      toast.success('Datos personales actualizados correctamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -520,9 +522,9 @@ export function UsuariosPage() {
       setUsuarios(prev => prev.map(u => (u.id === editingUsuario.id ? updated : u)));
       setIsEmailModalOpen(false);
       setEditingUsuario(null);
-      alert('Email actualizado correctamente');
+      toast.success('Email actualizado correctamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -543,9 +545,9 @@ export function UsuariosPage() {
       setUsuarios(prev => prev.map(u => (u.id === editingUsuario.id ? updated : u)));
       setIsRoleModalOpen(false);
       setEditingUsuario(null);
-      alert('Rol actualizado correctamente');
+      toast.success('Rol actualizado correctamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -572,9 +574,9 @@ export function UsuariosPage() {
 
       setIsPasswordModalOpen(false);
       setEditingUsuario(null);
-      alert('Contraseña actualizada correctamente');
+      toast.success('Contraseña actualizada correctamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -609,9 +611,9 @@ const handleClubSubmit = async (formData) => {
     setIsClubModalOpen(false);
     setUsuarioClub(null);
     await fetchUsuarios();
-    alert('Club asignado correctamente');
+    toast.success('Club asignado correctamente');
   } catch (err) {
-    alert(err.message);
+    toast.error(err.message);
   }
 };
 
@@ -1055,18 +1057,12 @@ const handleClubSubmit = async (formData) => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-600"></div>
-          <p className="mt-4 text-gray-600">Cargando usuarios...</p>
-        </div>
-      ) : (
-        <DataTable
-          data={filteredUsuarios}
-          columns={columns}
-          itemsPerPage={5}
-        />
-      )}
+      <DataTable
+        data={filteredUsuarios}
+        columns={columns}
+        itemsPerPage={5}
+        loading={loading}
+      />
 
       {/* Crear usuario */}
       <FormModal

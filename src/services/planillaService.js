@@ -1,7 +1,7 @@
 // src/services/planillaService.js
 // Servicio para obtener datos de partidos desde MongoDB para la planilla FIVB
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { API_BASE } from './api.config.js';
 
 const getAuthHeaders = () => {
   const token = sessionStorage.getItem('token');

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Building2, Trophy, Calendar, UserCheck, Briefcase } from 'lucide-react';
+import { API_BASE } from '../services/api.config';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = API_BASE;
 
 const getAuthHeaders = () => ({
   'Content-Type': 'application/json',

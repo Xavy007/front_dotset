@@ -13,10 +13,12 @@ import { categoriaService } from '../services/categoriaService';
 import { tablaPosicionesService } from '../services/tablaPosicionesService';
 import { planillaService } from '../services/planillaService';
 import PlanillaFIVB from '../components/PlanillaFIVB';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { API_BASE } from '../services/api.config';
+import { useAsociacion } from '../hooks/useAsociacion.js';
 
 export function ReportesPage() {
+  const { asociacion, logoUrl: logoAsociacion } = useAsociacion();
+
   // Tab activo
   const [activeTab, setActiveTab] = useState('rol-partidos');
 
@@ -488,8 +490,12 @@ export function ReportesPage() {
       ) : (
         <div className="space-y-4 print-section">
           <div className="print-header hidden print:block text-center mb-6">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              {logoAsociacion && <img src={logoAsociacion} alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />}
+              <p className="font-bold text-lg uppercase">{asociacion.nombre || 'Asociación de Voleibol'}</p>
+            </div>
             <h2 className="text-xl font-bold">{String(campeonatoSeleccionado?.nombre || '')}</h2>
-            <p>{String(categoriaSeleccionada?.categoria?.nombre || categoriaSeleccionada?.nombre || '')} - {String(jornadaSeleccionada?.nombre || `Jornada ${jornadaSeleccionada?.numero || ''}`)}</p>
+            <p>{String(categoriaSeleccionada?.categoria?.nombre || categoriaSeleccionada?.nombre || '')} — {String(jornadaSeleccionada?.nombre || `Jornada ${jornadaSeleccionada?.numero || ''}`)}</p>
           </div>
 
           {partidos.map((partido) => {
@@ -574,8 +580,12 @@ export function ReportesPage() {
       ) : (
         <div className="print-section">
           <div className="print-header hidden print:block text-center mb-6">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              {logoAsociacion && <img src={logoAsociacion} alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />}
+              <p className="font-bold text-lg uppercase">{asociacion.nombre || 'Asociación de Voleibol'}</p>
+            </div>
             <h2 className="text-xl font-bold">{campeonatoSeleccionado?.nombre}</h2>
-            <p>Tabla de Posiciones - {String(categoriaSeleccionada?.categoria?.nombre || categoriaSeleccionada?.nombre || '')}</p>
+            <p>Tabla de Posiciones — {String(categoriaSeleccionada?.categoria?.nombre || categoriaSeleccionada?.nombre || '')}</p>
           </div>
 
           <div className="overflow-x-auto">

@@ -3,9 +3,8 @@ import { MapPin, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { fixtureService } from '../services/fixtureService';
 import { campeonatoService } from '../services/campeonatoService';
 import ModalAsignarRecursos from '../components/ModalAsignarRecursos';
-
-// URL del servidor para archivos estáticos (logos, imágenes)
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
+import { toast } from 'sonner';
+import { SERVER_URL } from '../services/api.config';
 
 export const PartidosPage = () => {
   // Estado para filtros
@@ -140,11 +139,11 @@ export const PartidosPage = () => {
         setShowModal(false);
         setEditingPartido(null);
       } else {
-        alert('Error al actualizar partido');
+        toast.error('Error al actualizar partido');
       }
     } catch (error) {
       console.error('Error actualizando partido:', error);
-      alert('Error al actualizar partido: ' + error.message);
+      toast.error('Error al actualizar partido: ' + error.message);
     }
   };
 

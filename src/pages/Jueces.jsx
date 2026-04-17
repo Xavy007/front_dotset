@@ -5,16 +5,21 @@
 // ===============================================
 
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, AlertCircle } from 'lucide-react';
+import { Users, Plus, Search, AlertCircle, CheckCircle, Award } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+import PageHeader from '../components/PageHeader';
+import StatCard, { StatsRow } from '../components/StatCard';
+import ConfirmModal from '../components/ConfirmModal';
+import { API_BASE } from '../services/api.config';
 
 // AJUSTA ESTAS URLs A TU BACKEND
-const API_URL_JUEZ = 'http://localhost:8080/api/jueces';
-const API_URL_PERSONA = 'http://localhost:8080/api/persona';
-const API_URL_NACIONALIDAD = 'http://localhost:8080/api/nacionalidad';
-const API_URL_DEPARTAMENTO = 'http://localhost:8080/api/departamentos';
-const API_URL_PROVINCIA = 'http://localhost:8080/api/provincias';
+const API_URL_JUEZ = `${API_BASE}/jueces`;
+const API_URL_PERSONA = `${API_BASE}/persona`;
+const API_URL_NACIONALIDAD = `${API_BASE}/nacionalidad`;
+const API_URL_DEPARTAMENTO = `${API_BASE}/departamentos`;
+const API_URL_PROVINCIA = `${API_BASE}/provincias`;
 
 const getAuthHeaders = () => {
   const token = sessionStorage.getItem('token');
@@ -128,6 +133,7 @@ export function JuecesPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingJuez, setEditingJuez] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirm, setConfirm] = useState({ open: false, id: null });
 
   const fetchJueces = async () => {
     setLoading(true);
@@ -295,9 +301,9 @@ export function JuecesPage() {
 
       setIsCreateModalOpen(false);
       await fetchJueces();
-      alert('Juez creado exitosamente');
+      toast.success('Juez creado exitosamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -366,15 +372,18 @@ export function JuecesPage() {
       setIsEditModalOpen(false);
       setEditingJuez(null);
       await fetchJueces();
-      alert('Datos del juez actualizados correctamente');
+      toast.success('Datos del juez actualizados correctamente');
     } catch (err) {
       console.error('Error al editar juez', err);
-      alert(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('¿Estás seguro que deseas eliminar este juez?')) return;
+  const handleDelete = (id) => {
+    setConfirm({ open: true, id });
+  };
+
+  const confirmDelete = async (id) => {
     try {
       const res = await fetch(`${API_URL_JUEZ}/${id}`, {
         method: 'DELETE',
@@ -383,7 +392,7 @@ export function JuecesPage() {
       if (!res.ok) throw new Error('Error al eliminar juez');
       setJueces((prev) => prev.filter((j) => (j.id_juez ?? j.id) !== id));
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
     }
   };
 
@@ -725,20 +734,14 @@ export function JuecesPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-600" />
-          <p className="mt-4 text-gray-600">Cargando jueces...</p>
-        </div>
-      ) : (
-        <DataTable
-          data={filteredJueces}
-          columns={columns}
-          itemsPerPage={10}
-          onEdit={openEditModal}
-          onDelete={handleDelete}
-        />
-      )}
+      <DataTable
+        data={filteredJueces}
+        columns={columns}
+        itemsPerPage={10}
+        loading={loading}
+        onEdit={openEditModal}
+        onDelete={handleDelete}
+      />
 
       <FormModal
         isOpen={isCreateModalOpen}

@@ -5,6 +5,7 @@ import { categoriaService } from '../services/categoriaService';
 import { inscripcionService } from '../services/inscripcionService';
 import { equipoService } from '../services/equipoService';
 import ModalInscribirEquipos from '../components/ModalInscribirEquipos';
+import { toast } from 'sonner';
 
 export default function GestionInscripciones() {
   const [campeonatos, setCampeonatos] = useState([]);
@@ -86,7 +87,7 @@ export default function GestionInscripciones() {
       cargarInscripciones();
     } catch (error) {
       console.error('Error al eliminar inscripción:', error);
-      alert('Error al eliminar la inscripción');
+      toast.error('Error al eliminar la inscripción');
     }
   };
 
@@ -98,7 +99,7 @@ export default function GestionInscripciones() {
       cargarInscripciones();
     } catch (error) {
       console.error('Error al actualizar grupo:', error);
-      alert('Error al actualizar el grupo');
+      toast.error('Error al actualizar el grupo');
     }
   };
 

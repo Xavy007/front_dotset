@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Clock, Trophy, AlertCircle } from 'lucide-react';
+import { API_BASE, SERVER_URL } from '../services/api.config';
 
-const API_BASE_URL = 'http://localhost:8080/api';
-
-// URL del servidor para archivos estáticos (logos, imágenes)
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
+const API_BASE_URL = API_BASE;
 
 const getAuthHeaders = () => ({
   'Content-Type': 'application/json',

@@ -1,7 +1,7 @@
 // src/services/reportesService.js
 // Servicio para consumir los endpoints de reportes del backend
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { API_BASE } from './api.config.js';
 
 // Función helper para hacer peticiones
 const request = async (url, options = {}) => {

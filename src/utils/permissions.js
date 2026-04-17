@@ -5,6 +5,7 @@
 export const PERMISSIONS = {
   admin: {
     dashboard: ['leer'],
+    asociacion: ['leer', 'actualizar'],
     usuarios: ['crear', 'leer', 'actualizar', 'eliminar', 'cambiar_estado', 'cambiar_rol'],
     jugadores: ['crear', 'leer', 'actualizar', 'eliminar'],
     gestiones:['crear', 'leer', 'actualizar', 'eliminar'],

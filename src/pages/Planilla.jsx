@@ -4,6 +4,7 @@ import { View, Button, StyleSheet, ActivityIndicator, Alert } from 'react-native
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { API_BASE } from '../services/api.config';
 
 export default function PlanillaScreen({ route }) {
   const { idpartido } = route.params;
@@ -11,14 +12,14 @@ export default function PlanillaScreen({ route }) {
   const [loading, setLoading] = useState(false);
 
   const verPlanilla = () => {
-    setPlanillaURL(`http://localhost:8080/api/mongodb/planilla/${idpartido}/html`);
+    setPlanillaURL(`${API_BASE}/mongodb/planilla/${idpartido}/html`);
   };
 
   const descargarPDF = async () => {
     setLoading(true);
     try {
       const downloadResumable = FileSystem.createDownloadResumable(
-        `http://localhost:8080/api/mongodb/planilla/${idpartido}/descargar`,
+        `${API_BASE}/mongodb/planilla/${idpartido}/descargar`,
         FileSystem.documentDirectory + `planilla_${idpartido}.pdf`
       );
 

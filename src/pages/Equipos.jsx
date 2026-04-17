@@ -6,10 +6,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Plus, Search, AlertCircle,
-  Pencil, Power, Trash2, Users, ClipboardList, CreditCard, Printer
+  Pencil, Power, Trash2, Users, ClipboardList, CreditCard, Printer, CheckCircle, XCircle
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+import PageHeader from '../components/PageHeader';
+import StatCard, { StatsRow } from '../components/StatCard';
+import ConfirmModal from '../components/ConfirmModal';
+import { API_BASE } from '../services/api.config.js';
 
 export function EquiposPage() {
   const [equipos, setEquipos] = useState([]);
@@ -40,9 +45,12 @@ export function EquiposPage() {
   const [carnetSeleccionado, setCarnetSeleccionado] = useState(null);
   const [loadingCarnet, setLoadingCarnet] = useState(false);
 
-  const API_URL = 'http://localhost:8080/api/equipo';
-  const API_URL_CLUB = 'http://localhost:8080/api/club';
-  const API_URL_CATEGORIA = 'http://localhost:8080/api/categoria';
+  // Estado para ConfirmModal
+  const [confirm, setConfirm] = useState({ open: false, id: null, type: null, equipo: null });
+
+  const API_URL = `${API_BASE}/equipo`;
+  const API_URL_CLUB = `${API_BASE}/club`;
+  const API_URL_CATEGORIA = `${API_BASE}/categoria`;
 
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');
@@ -131,7 +139,7 @@ export function EquiposPage() {
 
   const fetchCampeonatos = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/campeonato', {
+      const res = await fetch(`${API_BASE}/campeonato`, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -193,10 +201,10 @@ export function EquiposPage() {
       await fetchEquipos();
       setIsModalOpen(false);
       setEditingEquipo(null);
-      alert('Equipo guardado correctamente');
+      toast.success('Equipo guardado correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -205,8 +213,11 @@ export function EquiposPage() {
   // ===============================================
   const toggleEstado = async (equipo) => {
     const nuevoEstado = !equipo.estadoBooleano;
-    if (!window.confirm(`¿Deseas ${nuevoEstado ? 'activar' : 'desactivar'} este equipo?`)) return;
+    setConfirm({ open: true, type: 'toggle', equipo, id: equipo.id_equipo });
+  };
 
+  const doToggleEstado = async (equipo) => {
+    const nuevoEstado = !equipo.estadoBooleano;
     try {
       const res = await fetch(`${API_URL}/${equipo.id_equipo}/estado`, {
         method: 'PUT',
@@ -214,7 +225,6 @@ export function EquiposPage() {
         body: JSON.stringify({ estado: nuevoEstado }),
       });
       if (!res.ok) throw new Error('Error al cambiar el estado');
-
       setEquipos(prev =>
         prev.map(e =>
           e.id_equipo === equipo.id_equipo
@@ -224,15 +234,18 @@ export function EquiposPage() {
       );
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
   // ===============================================
   // ELIMINAR EQUIPO
   // ===============================================
-  const handleDelete = async (id_equipo) => {
-    if (!window.confirm('¿Estás seguro que deseas eliminar este equipo?')) return;
+  const handleDelete = (id_equipo) => {
+    setConfirm({ open: true, type: 'delete', id: id_equipo, equipo: null });
+  };
+
+  const doDelete = async (id_equipo) => {
     try {
       const res = await fetch(`${API_URL}/${id_equipo}`, {
         method: 'DELETE',
@@ -240,10 +253,10 @@ export function EquiposPage() {
       });
       if (!res.ok) throw new Error('Error al eliminar el equipo');
       setEquipos(prev => prev.filter(e => e.id_equipo !== id_equipo));
-      alert('Equipo eliminado correctamente');
+      toast.success('Equipo eliminado correctamente');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -303,7 +316,7 @@ export function EquiposPage() {
       }
     } catch (err) {
       console.error('❌ Error cargando plantilla:', err);
-      alert('Error al cargar la plantilla: ' + err.message);
+      toast.error('Error al cargar la plantilla: ' + err.message);
     } finally {
       setLoadingPlantilla(false);
     }
@@ -328,7 +341,7 @@ export function EquiposPage() {
       const id_gestion = participacion.campeonato.id_gestion || participacion.campeonato.gestion;
 
       const res = await fetch(
-        `http://localhost:8080/api/carnet/jugador/${participacion.jugador.id_jugador}/gestion/${id_gestion}`,
+        `${API_BASE}/carnet/jugador/${participacion.jugador.id_jugador}/gestion/${id_gestion}`,
         { headers: getAuthHeaders() }
       );
 
@@ -341,12 +354,12 @@ export function EquiposPage() {
           categoria: participacion.categoria
         });
       } else {
-        alert('Este jugador no tiene carnet activo para esta gestión');
+        toast.warning('Este jugador no tiene carnet activo para esta gestión');
         setIsCarnetModalOpen(false);
       }
     } catch (err) {
       console.error('Error cargando carnet:', err);
-      alert('Error al cargar el carnet');
+      toast.error('Error al cargar el carnet');
       setIsCarnetModalOpen(false);
     } finally {
       setLoadingCarnet(false);
@@ -360,7 +373,7 @@ export function EquiposPage() {
   const handleGuardarInscripciones = async (formData) => {
     try {
       if (!formData.jugadores_seleccionados || formData.jugadores_seleccionados.length === 0) {
-        alert('Debes seleccionar al menos un jugador');
+        toast.warning('Debes seleccionar al menos un jugador');
         return;
       }
 
@@ -380,7 +393,7 @@ export function EquiposPage() {
           estado: 'activo'
         };
 
-        return fetch('http://localhost:8080/api/participaciones', {
+        return fetch(`${API_BASE}/participaciones`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify(bodyData)
@@ -392,11 +405,11 @@ export function EquiposPage() {
 
       await Promise.all(promesas);
 
-      alert(`✅ ${formData.jugadores_seleccionados.length} jugador(es) inscrito(s) exitosamente`);
+      toast.success(`${formData.jugadores_seleccionados.length} jugador(es) inscrito(s) exitosamente`);
       setIsGestionarPlantillaOpen(false);
       setEquipoSeleccionado(null);
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
@@ -530,7 +543,7 @@ export function EquiposPage() {
         onChange: async (value) => {
           if (value && equipoSeleccionado) {
             // Obtener datos del campeonato seleccionado para extraer la gestión
-            const res = await fetch(`http://localhost:8080/api/campeonato/${value}`, {
+            const res = await fetch(`${API_BASE}/campeonato/${value}`, {
               headers: getAuthHeaders()
             });
             const data = await res.json();
@@ -576,10 +589,12 @@ export function EquiposPage() {
   // ===============================================
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">⚽ Equipos</h1>
-        <p className="text-gray-600 mt-2">Gestiona los equipos registrados en el sistema.</p>
-      </div>
+      <PageHeader
+        icon={Shield}
+        title="Equipos"
+        subtitle="Gestiona los equipos registrados en el sistema."
+        action={{ label: 'Nuevo Equipo', icon: Plus, onClick: () => { setEditingEquipo(null); setIsModalOpen(true); } }}
+      />
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3 items-center">
@@ -599,37 +614,15 @@ export function EquiposPage() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button
-          onClick={() => { setEditingEquipo(null); setIsModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus size={20} /> Nuevo Equipo
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm">Total Equipos</p>
-          <p className="text-2xl font-bold text-gray-900">{equipos.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm">Activos</p>
-          <p className="text-2xl font-bold text-green-600">{totalActivos}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-red-500">
-          <p className="text-gray-600 text-sm">Inactivos</p>
-          <p className="text-2xl font-bold text-red-600">{totalInactivos}</p>
-        </div>
-      </div>
+      <StatsRow cols={3}>
+        <StatCard title="Total Equipos" value={equipos.length} icon={Shield} color="blue" loading={loading} />
+        <StatCard title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard title="Inactivos" value={totalInactivos} icon={XCircle} color="red" loading={loading} />
+      </StatsRow>
 
-      {loading ? (
-        <div className="bg-white rounded-lg p-6 text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-gray-200 border-t-blue-500 mx-auto rounded-full"></div>
-          <p className="mt-3 text-gray-600">Cargando equipos...</p>
-        </div>
-      ) : (
-        <DataTable data={filteredEquipos} columns={columns} itemsPerPage={5} />
-      )}
+      <DataTable data={filteredEquipos} columns={columns} itemsPerPage={5} loading={loading} />
 
       <FormModal
         isOpen={isModalOpen}
@@ -834,6 +827,18 @@ export function EquiposPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirm.open}
+        onClose={() => setConfirm({ open: false, id: null, type: null, equipo: null })}
+        onConfirm={() => {
+          if (confirm.type === 'delete') doDelete(confirm.id);
+          if (confirm.type === 'toggle') doToggleEstado(confirm.equipo);
+        }}
+        title={confirm.type === 'delete' ? '¿Eliminar Equipo?' : `¿${confirm.equipo && !confirm.equipo.estadoBooleano ? 'Activar' : 'Desactivar'} Equipo?`}
+        message="Esta acción no se puede deshacer."
+        confirmText={confirm.type === 'delete' ? 'Eliminar' : 'Confirmar'}
+      />
 
       {/* Modal de Carnet */}
       {isCarnetModalOpen && (

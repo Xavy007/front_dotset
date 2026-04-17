@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Check, Users, Search } from 'lucide-react';
 import { equipoService } from '../services/equipoService';
 import { inscripcionService } from '../services/inscripcionService';
+import { toast } from 'sonner';
 
 export default function ModalInscribirEquipos({ isOpen, onClose, categoriaInfo, onSave }) {
   const [equipos, setEquipos] = useState([]);
@@ -21,30 +22,15 @@ export default function ModalInscribirEquipos({ isOpen, onClose, categoriaInfo, 
   const cargarEquipos = async () => {
     try {
       setLoading(true);
-      const response = await equipoService.getAll();
+      const id_categoria = categoriaInfo.categoria?.id_categoria;
+      const response = await equipoService.getByCategoria(id_categoria);
 
       if (response.success && response.data) {
-        // Filtrar equipos por género según la categoría del campeonato
-        const equiposFiltrados = response.data.filter(equipo => {
-          const categoriaCampeonato = categoriaInfo.categoria;
-
-          // Si la categoría del campeonato es mixta, aceptar todos los equipos
-          if (categoriaCampeonato.genero === 'mixto') {
-            return true;
-          }
-
-          // Comparar el género de la categoría del equipo con la del campeonato
-          const generoEquipo = equipo.categoria?.genero;
-
-          // Solo mostrar equipos cuyo género coincida con el de la categoría del campeonato
-          return generoEquipo === categoriaCampeonato.genero;
-        });
-
-        setEquipos(equiposFiltrados);
+        setEquipos(response.data);
       }
     } catch (error) {
       console.error('Error al cargar equipos:', error);
-      alert('Error al cargar los equipos');
+      toast.error('Error al cargar los equipos');
     } finally {
       setLoading(false);
     }
@@ -83,7 +69,7 @@ export default function ModalInscribirEquipos({ isOpen, onClose, categoriaInfo, 
 
   const handleSave = async () => {
     if (selectedEquipos.length === 0) {
-      alert('Debes seleccionar al menos un equipo');
+      toast.warning('Debes seleccionar al menos un equipo');
       return;
     }
 
@@ -93,7 +79,7 @@ export default function ModalInscribirEquipos({ isOpen, onClose, categoriaInfo, 
       onSave?.();
     } catch (error) {
       console.error('Error al inscribir equipos:', error);
-      alert('Error al inscribir los equipos: ' + error.message);
+      toast.error('Error al inscribir los equipos: ' + error.message);
     } finally {
       setSaving(false);
     }

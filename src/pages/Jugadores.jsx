@@ -5,11 +5,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, AlertCircle,
-  Pencil, Trash2, CreditCard, Clock, CheckCircle, XCircle, Bell, UserPlus, Printer
+  Pencil, Trash2, CreditCard, Clock, CheckCircle, XCircle, Bell, UserPlus, Printer,
+  LayoutGrid, List
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
 import InscripcionParticipacionModal from '../components/InscripcionParticipacionModal';
+import PageHeader from '../components/PageHeader';
+import StatCard, { StatsRow } from '../components/StatCard';
+import { toast } from 'sonner';
+import { API_BASE, SERVER_URL } from '../services/api.config.js';
+import { useAsociacion } from '../hooks/useAsociacion.js';
 
 export function JugadoresPage() {
   const [jugadores, setJugadores] = useState([]);
@@ -46,8 +52,15 @@ export function JugadoresPage() {
 
 
   const [categorias, setCategorias] = useState([]);
-  const [categoriasCompletas, setCategoriasCompletas] = useState([]); // Guardar datos completos con edad_inicio y edad_limite
+  const [categoriasCompletas, setCategoriasCompletas] = useState([]);
   const [catError, setCatError] = useState(null);
+
+  const { asociacion, logoUrl: logoAsociacion } = useAsociacion();
+
+  // Vista y filtros
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
+  const [filterClub, setFilterClub] = useState('');
+  const [filterCarnet, setFilterCarnet] = useState('');
 
   const getUsuarioLogueado = () => {
     try {
@@ -74,15 +87,15 @@ export function JugadoresPage() {
   const esAdminOSecretario = ['admin', 'secretario', 'presidente'].includes(rolUsuario);
   const esClubRepresentante = ['presidenteclub', 'representante'].includes(rolUsuario);
 
-  const API_URL_JUGADOR = 'http://localhost:8080/api/jugadores';
-  const API_URLPersona = 'http://localhost:8080/api/persona';
-  const API_URLNacionalidad = 'http://localhost:8080/api/nacionalidad/';
-  const API_URLDepartamento = 'http://localhost:8080/api/departamentos';
-  const API_URLProvincia = 'http://localhost:8080/api/provincias';
-  const API_URL_CLUB = 'http://localhost:8080/api/club';
-  const API_URL_CARNET = 'http://localhost:8080/api/carnets';
-  const API_URL_GESTION = 'http://localhost:8080/api/gestion';
-  const API_URL_CATEGORIA = 'http://localhost:8080/api/categoria'; // ajusta si cambia
+  const API_URL_JUGADOR = `${API_BASE}/jugadores`;
+  const API_URLPersona = `${API_BASE}/persona`;
+  const API_URLNacionalidad = `${API_BASE}/nacionalidad/`;
+  const API_URLDepartamento = `${API_BASE}/departamentos`;
+  const API_URLProvincia = `${API_BASE}/provincias`;
+  const API_URL_CLUB = `${API_BASE}/club`;
+  const API_URL_CARNET = `${API_BASE}/carnets`;
+  const API_URL_GESTION = `${API_BASE}/gestion`;
+  const API_URL_CATEGORIA = `${API_BASE}/categoria`;
 
   
   
@@ -270,6 +283,7 @@ const fetchCategorias = async () => {
     const estatura = j.estatura ?? 0;
     const foto = j.foto ?? p.foto ?? null;
     const nombreClub = j.Club?.nombre ?? j.club?.nombre ?? null;
+    const logoClub   = j.Club?.logo  ?? j.club?.logo  ?? null;
 
     const carnet = j.Carnet ?? j.carnet ?? j.carnets?.[0] ?? null;
     const estadoCarnet = carnet?.estado_carnet ?? 'sin_carnet';
@@ -298,6 +312,7 @@ const fetchCategorias = async () => {
       estatura,
       foto,
       nombreClub,
+      logoClub,
       carnet,
       estadoCarnet,
       numeroCarnet,
@@ -478,14 +493,14 @@ const fetchCategorias = async () => {
       if (!response.ok) throw new Error('Error al eliminar');
       setJugadores(prev => prev.filter(j => (j.id_jugador ?? j.id) !== id));
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
   // ✅ ACTUALIZADO: Ahora abre el modal
   const handleCrearCarnet = async (jugador) => {
     if (gestiones.length === 0) {
-      alert('No hay gestiones activas disponibles. Cree una gestión primero.');
+      toast.warning('No hay gestiones activas disponibles. Cree una gestión primero.');
       return;
     }
 
@@ -496,7 +511,7 @@ const fetchCategorias = async () => {
 
   // ✅ NUEVA FUNCIÓN: Procesar creación de carnet
   const procesarCrearCarnet = async (formData) => {
-    alert('🎯 PROCESANDO CARNET - VER CONSOLA');
+    toast.success('Procesando carnet...');
     console.log('🎯 procesarCrearCarnet iniciado');
     console.log('📋 formData completo:', formData);
     console.log('📷 formData.foto_carnet:', formData.foto_carnet);
@@ -549,17 +564,17 @@ const fetchCategorias = async () => {
 
       setIsGestionModalOpen(false);
       setJugadorParaCarnet(null);
-      alert('✅ Carnet creado. Ahora puedes revisarlo y activarlo.');
+      toast.success('Carnet creado. Ahora puedes revisarlo y activarlo.');
       await fetchJugadores();
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
   // ✅ ACTUALIZADO: Ahora abre el modal
   const handleSolicitarCarnet = async (jugador) => {
     if (gestiones.length === 0) {
-      alert('No hay gestiones activas disponibles.');
+      toast.warning('No hay gestiones activas disponibles.');
       return;
     }
     console.log("entro en solicitar");
@@ -596,10 +611,10 @@ const fetchCategorias = async () => {
 
       setIsGestionModalOpen(false);
       setJugadorParaCarnet(null);
-      alert('📋 Solicitud enviada correctamente.\n\nEstado: EN PROCESO DE CERTIFICACIÓN');
+      toast.success('Solicitud enviada correctamente. Estado: EN PROCESO DE CERTIFICACIÓN');
       await fetchJugadores();
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
@@ -656,10 +671,10 @@ const fetchCategorias = async () => {
       }
 
       setIsCreateModalOpen(false);
-      alert('✅ Jugador creado exitosamente');
+      toast.success('Jugador creado exitosamente');
       await fetchJugadores();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -725,10 +740,10 @@ const fetchCategorias = async () => {
       setIsEditModalOpen(false);
       setEditingJugador(null);
       await fetchJugadores();
-      alert('✅ Datos del jugador actualizados correctamente');
+      toast.success('Datos del jugador actualizados correctamente');
     } catch (err) {
       console.error('Error al editar:', err);
-      alert('❌ Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
@@ -748,7 +763,7 @@ const fetchCategorias = async () => {
       if (!res.ok) throw new Error('Error al aprobar carnet');
 
       if (!silencioso) {
-        alert('✅ Carnet aprobado correctamente');
+        toast.success('Carnet aprobado correctamente');
         await fetchCarnetsPendientes();
         await fetchJugadores();
       }
@@ -756,7 +771,7 @@ const fetchCategorias = async () => {
       setIsCarnetModalOpen(false);
       setSelectedCarnet(null);
     } catch (err) {
-      if (!silencioso) alert('Error: ' + err.message);
+      if (!silencioso) toast.error('Error: ' + err.message);
       throw err;
     }
   };
@@ -779,13 +794,13 @@ const fetchCategorias = async () => {
 
       if (!res.ok) throw new Error('Error al rechazar carnet');
 
-      alert('Carnet rechazado');
+      toast.success('Carnet rechazado');
       await fetchCarnetsPendientes();
       await fetchJugadores();
       setIsCarnetModalOpen(false);
       setSelectedCarnet(null);
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 
@@ -1218,18 +1233,29 @@ const fetchCategorias = async () => {
 
   const filteredJugadores = Array.isArray(jugadores)
     ? jugadores.filter(j => {
-      const term = searchTerm.toLowerCase();
-      return (j.nombreCompleto ?? '').toLowerCase().includes(term)
-        || (j.ci ?? '').toLowerCase().includes(term);
-    })
+        const term = searchTerm.toLowerCase();
+        const matchSearch = (j.nombreCompleto ?? '').toLowerCase().includes(term)
+          || (j.ci ?? '').toLowerCase().includes(term);
+        const matchClub   = !filterClub   || String(j.id_club) === filterClub;
+        const matchCarnet = !filterCarnet || (j.estadoCarnet ?? 'sin_carnet') === filterCarnet;
+        return matchSearch && matchClub && matchCarnet;
+      })
     : [];
+
+  // Opciones únicas de club para el selector de filtro
+  const clubOptions = Array.from(
+    new Map(jugadores.map(j => [j.id_club, j.nombreClub])).entries()
+  ).filter(([id]) => id != null)
+   .sort((a, b) => (a[1] ?? '').localeCompare(b[1] ?? ''));
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Jugadores</h1>
-        <p className="text-gray-600 mt-2">Gestiona los jugadores del sistema.</p>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="Jugadores"
+        subtitle="Gestiona los jugadores del sistema."
+        action={{ label: 'Nuevo Jugador', icon: Plus, onClick: openCreateModal }}
+      />
 
       {esAdminOSecretario && carnetsPendientes.length > 0 && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -1290,75 +1316,198 @@ const fetchCategorias = async () => {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar jugador (nombre o CI)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+      <StatsRow cols={4}>
+        <StatCard title="Total Jugadores" value={jugadores.length}                                             icon={Users}        color="blue"   loading={loading} />
+        <StatCard title="Carnets Activos" value={jugadores.filter(j => j.estadoCarnet === 'activo').length}    icon={CheckCircle}  color="green"  loading={loading} />
+        <StatCard title="En Proceso"      value={jugadores.filter(j => j.estadoCarnet === 'pendiente').length} icon={Clock}        color="yellow" loading={loading} />
+        <StatCard title="Sin Carnet"      value={jugadores.filter(j => j.estadoCarnet === 'sin_carnet').length} icon={XCircle}     color="gray"   loading={loading} />
+      </StatsRow>
+
+      {/* ── Buscador + filtros + toggle de vista ── */}
+      <div className="flex flex-wrap items-center gap-3 mb-5 mt-6">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar jugador (nombre o CI)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        <select
+          value={filterClub}
+          onChange={(e) => setFilterClub(e.target.value)}
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <Plus size={20} />
-          Nuevo Jugador
-        </button>
+          <option value="">Todos los clubs</option>
+          {clubOptions.map(([id, nombre]) => (
+            <option key={id} value={String(id)}>{nombre}</option>
+          ))}
+        </select>
+
+        <select
+          value={filterCarnet}
+          onChange={(e) => setFilterCarnet(e.target.value)}
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Estado carnet</option>
+          <option value="activo">Activo</option>
+          <option value="pendiente">En proceso</option>
+          <option value="sin_carnet">Sin carnet</option>
+          <option value="vencido">Vencido</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+
+        <span className="text-sm text-gray-400 whitespace-nowrap">
+          <span className="font-medium text-gray-700">{filteredJugadores.length}</span> de{' '}
+          <span className="font-medium text-gray-700">{jugadores.length}</span>
+        </span>
+
+        <div className="flex gap-1 ml-auto">
+          <button
+            onClick={() => setViewMode('cards')}
+            title="Vista tarjetas"
+            className={`p-2 rounded-lg border transition-colors ${viewMode === 'cards' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
+          >
+            <LayoutGrid size={18} />
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            title="Vista tabla"
+            className={`p-2 rounded-lg border transition-colors ${viewMode === 'table' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
+          >
+            <List size={18} />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Total Jugadores</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : jugadores.length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="text-green-500" size={20} />
-            <p className="text-gray-600 text-sm">Carnets Activos</p>
-          </div>
-          <p className="text-2xl font-bold text-green-600">
-            {loading ? '...' : jugadores.filter(j => j.estadoCarnet === 'activo').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex items-center gap-2">
-            <Clock className="text-yellow-500" size={20} />
-            <p className="text-gray-600 text-sm">En Proceso</p>
-          </div>
-          <p className="text-2xl font-bold text-yellow-600">
-            {loading ? '...' : jugadores.filter(j => j.estadoCarnet === 'pendiente').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex items-center gap-2">
-            <XCircle className="text-gray-400" size={20} />
-            <p className="text-gray-600 text-sm">Sin Carnet</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-600">
-            {loading ? '...' : jugadores.filter(j => j.estadoCarnet === 'sin_carnet').length}
-          </p>
-        </div>
-      </div>
+      {/* ── Vista Cards ── */}
+      {viewMode === 'cards' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
+          {loading && [...Array(10)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 h-52 animate-pulse" />
+          ))}
+          {!loading && filteredJugadores.length === 0 && (
+            <div className="col-span-full text-center py-16 text-gray-400 text-sm">
+              No se encontraron jugadores con los filtros aplicados.
+            </div>
+          )}
+          {!loading && filteredJugadores.map((j) => {
+            const estado    = (j.estadoCarnet || 'sin_carnet').toString().trim().toLowerCase();
+            const initials  = `${(j.nombre || '')[0] || ''}${(j.ap || '')[0] || ''}`.toUpperCase() || '?';
+            const buildUrl  = (path) => path ? `${SERVER_URL}${path.startsWith('/') ? path : '/' + path}` : null;
+            const fotoUrl   = buildUrl(j.foto);
+            const logoUrl   = buildUrl(j.logoClub);
 
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-600"></div>
-          <p className="mt-4 text-gray-600">Cargando jugadores...</p>
+            const estadoBadge = {
+              activo:    { bg: 'bg-green-100',  text: 'text-green-700',  label: 'Activo' },
+              pendiente: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'En proceso' },
+              vencido:   { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Vencido' },
+              cancelado: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Cancelado' },
+              sin_carnet:{ bg: 'bg-gray-100',   text: 'text-gray-500',   label: 'Sin carnet' },
+            }[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Sin carnet' };
+
+            const puedeCrear     = esAdminOSecretario  && (estado === 'sin_carnet' || estado === 'sin carnet');
+            const puedeSolicitar = esClubRepresentante && (estado === 'sin_carnet' || estado === 'sin carnet');
+            const puedeAprobar   = esAdminOSecretario  && estado === 'pendiente';
+            const puedeVer       = estado === 'activo';
+
+            const abrirCarnetCompleto = async () => {
+              try {
+                const carnetId = j.carnet?.id_carnet || j.carnet?.id;
+                const res  = await fetch(`${API_URL_CARNET}/${carnetId}`, { headers: getAuthHeaders() });
+                const data = res.ok ? await res.json() : null;
+                setSelectedCarnet(data ? (data.data || data.carnet || data) : j.carnet);
+              } catch {
+                setSelectedCarnet(j.carnet);
+              }
+              setIsCarnetModalOpen(true);
+            };
+
+            return (
+              <div key={j.id_jugador} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                {/* Foto + nombre */}
+                <div className="pt-5 pb-3 flex flex-col items-center relative bg-gray-50">
+                  {/* Logo del club — badge esquina superior derecha */}
+                  {logoUrl && (
+                    <img
+                      src={logoUrl}
+                      alt={j.nombreClub || ''}
+                      title={j.nombreClub || ''}
+                      className="absolute top-2 right-2 w-12 h-12 object-contain"
+                    />
+                  )}
+                  <div className="flex flex-col items-center">
+                    {fotoUrl ? (
+                      <img src={fotoUrl} alt={j.nombreCompleto} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-blue-100 border-2 border-white shadow flex items-center justify-center text-blue-700 font-bold text-xl">
+                        {initials}
+                      </div>
+                    )}
+                    <p className="mt-2 font-semibold text-gray-900 text-sm text-center px-2 leading-tight">{j.nombreCompleto || 'Sin nombre'}</p>
+                    <p className="text-xs text-gray-400">CI: {j.ci || '—'}</p>
+                  </div>
+                </div>
+
+                {/* Club + estatura + carnet */}
+                <div className="px-3 py-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium truncate max-w-[75%]">
+                      {j.nombreClub || 'Sin club'}
+                    </span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">{j.estatura ? `${j.estatura} cm` : '—'}</span>
+                  </div>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${estadoBadge.bg} ${estadoBadge.text}`}>
+                    {estadoBadge.label}
+                  </span>
+                </div>
+
+                {/* Acciones */}
+                <div className="px-3 pb-3 flex gap-1.5 mt-1">
+                  <button onClick={() => openEditModal(j)} title="Editar" className="flex-none p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                    <Pencil size={15} />
+                  </button>
+                  <button onClick={() => handleDelete(j.id_jugador ?? j.id)} title="Eliminar" className="flex-none p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 size={15} />
+                  </button>
+
+                  {puedeCrear && (
+                    <button onClick={() => handleCrearCarnet(j)} className="flex-1 py-1.5 text-xs rounded-lg bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 transition-colors flex items-center justify-center gap-1">
+                      <CreditCard size={13} /> Crear
+                    </button>
+                  )}
+                  {puedeSolicitar && (
+                    <button onClick={() => handleSolicitarCarnet(j)} className="flex-1 py-1.5 text-xs rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1">
+                      <CreditCard size={13} /> Solicitar
+                    </button>
+                  )}
+                  {puedeAprobar && (
+                    <button onClick={abrirCarnetCompleto} className="flex-1 py-1.5 text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1">
+                      <CheckCircle size={13} /> Revisar
+                    </button>
+                  )}
+                  {puedeVer && (
+                    <button onClick={abrirCarnetCompleto} className="flex-1 py-1.5 text-xs rounded-lg bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 transition-colors flex items-center justify-center gap-1">
+                      <CreditCard size={13} /> Carnet
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ) : (
+      )}
+
+      {/* ── Vista Tabla ── */}
+      {viewMode === 'table' && (
         <DataTable
           data={filteredJugadores}
           columns={columns}
           itemsPerPage={10}
+          loading={loading}
         />
       )}
 
@@ -1579,7 +1728,7 @@ const fetchCategorias = async () => {
                           letterSpacing: '0.15em'
                         }}
                       >
-                        VOLEIBOL * CERCADO
+                        {(asociacion.acronimo || asociacion.nombre || 'VOLEIBOL').toUpperCase()}
                       </p>
                     </div>
 
@@ -1592,18 +1741,20 @@ const fetchCategorias = async () => {
 
                     {/* Header con borde de color de categoría */}
                     <div
-                      className="relative pt-6 pb-4 text-center"
-                      style={{
-                        marginLeft: '50px',
-                        borderBottom: `5px solid ${colorBase}`
-                      }}
+                      className="relative pt-4 pb-3 flex items-center justify-center gap-4"
+                      style={{ marginLeft: '50px', borderBottom: `5px solid ${colorBase}`, paddingLeft: '20px', paddingRight: '20px' }}
                     >
-                      <p className="font-bold uppercase" style={{fontSize: '22px', color: '#1a1a1a', letterSpacing: '0.2em'}}>
-                        ASOCIACIÓN MUNICIPAL
-                      </p>
-                      <h1 className="font-black uppercase" style={{fontSize: '32px', color: '#000', letterSpacing: '0.15em'}}>
-                        CARNET DE JUGADOR
-                      </h1>
+                      {logoAsociacion && (
+                        <img src={logoAsociacion} alt="Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0 }} />
+                      )}
+                      <div className="text-center">
+                        <p className="font-bold uppercase" style={{ fontSize: '18px', color: '#1a1a1a', letterSpacing: '0.15em' }}>
+                          {(asociacion.nombre || 'ASOCIACIÓN DE VOLEIBOL').toUpperCase()}
+                        </p>
+                        <h1 className="font-black uppercase" style={{ fontSize: '26px', color: '#000', letterSpacing: '0.12em' }}>
+                          CARNET DE JUGADOR
+                        </h1>
+                      </div>
                     </div>
 
                     {/* Contenido principal */}
@@ -1616,7 +1767,7 @@ const fetchCategorias = async () => {
                             style={{ width: '175px', height: '205px', border: `5px solid ${colorBase}` }}
                           >
                             <img
-                              src={`http://localhost:8080${selectedCarnet.foto_carnet}`}
+                              src={`${SERVER_URL}${selectedCarnet.foto_carnet}`}
                               alt="Foto"
                               style={{width: '100%', height: '100%', objectFit: 'cover'}}
                             />
@@ -1830,7 +1981,7 @@ const fetchCategorias = async () => {
                         }}
                       >
                         <img
-                          src={`http://localhost:8080${selectedCarnet.foto_carnet}`}
+                          src={`${SERVER_URL}${selectedCarnet.foto_carnet}`}
                           alt="Foto"
                           style={{width: '100%', height: '100%', objectFit: 'cover'}}
                         />

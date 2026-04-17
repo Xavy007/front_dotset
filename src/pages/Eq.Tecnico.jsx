@@ -7,14 +7,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Search, AlertCircle } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import { toast } from 'sonner';
+
+import { API_BASE } from '../services/api.config.js';
 
 // AJUSTADAS AL NUEVO BACKEND
-const API_URL_EQTECNICO = 'http://localhost:8080/api/eqtecnico';
-const API_URL_PERSONA = 'http://localhost:8080/api/persona';
-const API_URL_NACIONALIDAD = 'http://localhost:8080/api/nacionalidad';
-const API_URL_DEPARTAMENTO = 'http://localhost:8080/api/departamentos';
-const API_URL_PROVINCIA = 'http://localhost:8080/api/provincias';
-const API_URL_CLUB = 'http://localhost:8080/api/club';
+const API_URL_EQTECNICO = `${API_BASE}/eqtecnico`;
+const API_URL_PERSONA = `${API_BASE}/persona`;
+const API_URL_NACIONALIDAD = `${API_BASE}/nacionalidad`;
+const API_URL_DEPARTAMENTO = `${API_BASE}/departamentos`;
+const API_URL_PROVINCIA = `${API_BASE}/provincias`;
+const API_URL_CLUB = `${API_BASE}/club`;
 
 const getAuthHeaders = () => {
   const token = sessionStorage.getItem('token');
@@ -447,9 +450,9 @@ export function EqTecnicoPage() {
       setCiMessage('');
       setCiMessageType('');
       await fetchTecnicos();
-      alert('Miembro del cuerpo técnico creado exitosamente');
+      toast.success('Miembro del cuerpo técnico creado exitosamente');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -526,11 +529,11 @@ const handleEditTecnico = async (formData) => {
     setIsEditModalOpen(false);
     setEditingTecnico(null);
     await fetchTecnicos();
-    alert('Datos del cuerpo técnico actualizados correctamente');
+    toast.success('Datos del cuerpo técnico actualizados correctamente');
     
   } catch (err) {
     console.error('❌ Error al editar técnico:', err);
-    alert(`Error: ${err.message}`);
+    toast.error(`Error: ${err.message}`);
   }
 };
 
@@ -552,7 +555,7 @@ const handleEditTecnico = async (formData) => {
         prev.filter((t) => (t.id_eqtecnico ?? t.id) !== id)
       );
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
     }
   };
 
@@ -901,20 +904,14 @@ const handleEditTecnico = async (formData) => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-600" />
-          <p className="mt-4 text-gray-600">Cargando cuerpo técnico...</p>
-        </div>
-      ) : (
-        <DataTable
-          data={filteredTecnicos}
-          columns={columns}
-          itemsPerPage={10}
-          /*onEdit={openEditModal}
-          onDelete={handleDelete}*/
-        />
-      )}
+      <DataTable
+        data={filteredTecnicos}
+        columns={columns}
+        itemsPerPage={10}
+        loading={loading}
+        /*onEdit={openEditModal}
+        onDelete={handleDelete}*/
+      />
 
       <FormModal
         isOpen={isCreateModalOpen}
