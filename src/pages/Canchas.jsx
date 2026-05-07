@@ -12,6 +12,7 @@ import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 import { API_BASE } from '../services/api.config.js';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 export function CanchasPage() {
   const [canchas, setCanchas] = useState([]);
@@ -20,6 +21,11 @@ export function CanchasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarCancha   = tienePermiso(_rol, 'canchas', 'actualizar');
+  const puedeEliminarCancha = tienePermiso(_rol, 'canchas', 'eliminar');
+  const puedeCrearCancha    = tienePermiso(_rol, 'canchas', 'crear');
 
   const API_URL = `${API_BASE}/cancha`;
 
@@ -76,9 +82,14 @@ export function CanchasPage() {
   // CREAR / EDITAR CANCHA
   // ===============================================
   const handleSubmit = async (formData) => {
+    if (!formData.nombre?.trim()) { toast.error('El nombre de la cancha es obligatorio'); return; }
+    if (!formData.tipo) { toast.error('Debes seleccionar el tipo de cancha'); return; }
+    if (formData.capacidad && Number(formData.capacidad) < 0) {
+      toast.error('La capacidad no puede ser negativa'); return;
+    }
     try {
       const body = {
-        nombre: formData.nombre,
+        nombre: formData.nombre.trim(),
         descripcion: formData.descripcion || null,
         direccion: formData.direccion || null,
         ubicacion: formData.ubicacion || null,
@@ -239,27 +250,33 @@ export function CanchasPage() {
       label: 'Acciones',
       render: (_v, row) => (
         <div className="flex items-center gap-2">
-          <button
-            title="Editar"
-            onClick={() => { setEditingCancha(row); setIsModalOpen(true); }}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all"
-          >
-            <Pencil size={18} className="text-blue-600" />
-          </button>
-          <button
-            title={row.estadoBooleano ? 'Desactivar' : 'Activar'}
-            onClick={() => toggleEstado(row)}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all"
-          >
-            <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
-          </button>
-          <button
-            title="Eliminar"
-            onClick={() => handleDelete(row.id_cancha)}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all"
-          >
-            <Trash2 size={18} className="text-red-600" />
-          </button>
+          {puedeEditarCancha && (
+            <button
+              title="Editar"
+              onClick={() => { setEditingCancha(row); setIsModalOpen(true); }}
+              className="p-2 border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all"
+            >
+              <Pencil size={18} className="text-blue-600" />
+            </button>
+          )}
+          {puedeEditarCancha && (
+            <button
+              title={row.estadoBooleano ? 'Desactivar' : 'Activar'}
+              onClick={() => toggleEstado(row)}
+              className="p-2 border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all"
+            >
+              <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
+            </button>
+          )}
+          {puedeEliminarCancha && (
+            <button
+              title="Eliminar"
+              onClick={() => handleDelete(row.id_cancha)}
+              className="p-2 border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all"
+            >
+              <Trash2 size={18} className="text-red-600" />
+            </button>
+          )}
         </div>
       )
     }
@@ -372,12 +389,14 @@ export function CanchasPage() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button
-          onClick={() => { setEditingCancha(null); setIsModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg"
-        >
-          <Plus size={20} /> Nueva Cancha
-        </button>
+        {puedeCrearCancha && (
+          <button
+            onClick={() => { setEditingCancha(null); setIsModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg"
+          >
+            <Plus size={20} /> Nueva Cancha
+          </button>
+        )}
       </div>
 
       {/* Estadísticas */}

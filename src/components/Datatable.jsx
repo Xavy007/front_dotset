@@ -76,11 +76,11 @@ export default function DataTable({
         <table className="w-full text-sm">
           {/* Headers */}
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-gradient-to-r from-slate-50 to-gray-50 border-b-2 border-gray-200">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                  className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap"
                 >
                   {column.label}
                 </th>

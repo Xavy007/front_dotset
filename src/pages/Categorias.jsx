@@ -14,6 +14,7 @@ import PageHeader from '../components/PageHeader';
 import StatCard, { StatsRow } from '../components/StatCard';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE } from '../services/api.config.js';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 export function CategoriasPage() {
   const [categorias, setCategorias] = useState([]);
@@ -24,7 +25,12 @@ export function CategoriasPage() {
   const [error, setError] = useState(null);
   const [selectedColor, setSelectedColor] = useState('#3B82F6');
   const [confirm, setConfirm] = useState({ open: false, id: null, type: null, cat: null });
-  
+
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarCat   = tienePermiso(_rol, 'categorias', 'actualizar');
+  const puedeEliminarCat = tienePermiso(_rol, 'categorias', 'eliminar');
+  const puedeCrearCat    = tienePermiso(_rol, 'categorias', 'crear');
+
   // NUEVOS ESTADOS PARA MÚLTIPLES GÉNEROS
   const [generosSeleccionados, setGenerosSeleccionados] = useState([]);
   const [creatingMultiple, setCreatingMultiple] = useState(false);
@@ -91,11 +97,24 @@ export function CategoriasPage() {
   // CREAR O ACTUALIZAR
 // CREAR O ACTUALIZAR
 const handleSubmit = async (formData) => {
+  // Validaciones comunes
+  if (!formData.nombre?.trim()) { toast.error('El nombre de la categoría es obligatorio'); return; }
+  const edadInicio = Number(formData.edad_inicio);
+  if (!formData.edad_inicio || isNaN(edadInicio) || edadInicio < 1) {
+    toast.error('La edad de inicio debe ser un número mayor a 0'); return;
+  }
+  if (formData.edad_limite) {
+    const edadLimite = Number(formData.edad_limite);
+    if (isNaN(edadLimite) || edadLimite <= edadInicio) {
+      toast.error('La edad límite debe ser mayor que la edad de inicio'); return;
+    }
+  }
+
   // Si está EDITANDO: comportamiento normal (1 categoría)
   if (editingCategoria) {
     try {
       const body = {
-        nombre: formData.nombre,
+        nombre: formData.nombre.trim(),
         descripcion: formData.descripcion || '',
         edad_inicio: Number(formData.edad_inicio),
         edad_limite: formData.edad_limite ? Number(formData.edad_limite) : null,
@@ -321,31 +340,33 @@ const handleSubmit = async (formData) => {
       label: 'Acciones',
       render: (_v, row) => (
         <div className="flex gap-2">
-          <button
-            title="Editar"
-            onClick={() => { 
-              setEditingCategoria(row); 
-              setSelectedColor(row.color || '#3B82F6');
-              setIsModalOpen(true); 
-            }}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all"
-          >
-            <Pencil size={18} className="text-blue-600" />
-          </button>
-          <button
-            title={row.estadoBooleano ? 'Desactivar' : 'Activar'}
-            onClick={() => toggleEstado(row)}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all"
-          >
-            <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
-          </button>
-          <button
-            title="Eliminar"
-            onClick={() => handleDelete(row.id_categoria)}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all"
-          >
-            <Trash2 size={18} className="text-red-600" />
-          </button>
+          {puedeEditarCat && (
+            <button
+              title="Editar"
+              onClick={() => { setEditingCategoria(row); setSelectedColor(row.color || '#3B82F6'); setIsModalOpen(true); }}
+              className="p-2 border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all"
+            >
+              <Pencil size={18} className="text-blue-600" />
+            </button>
+          )}
+          {puedeEditarCat && (
+            <button
+              title={row.estadoBooleano ? 'Desactivar' : 'Activar'}
+              onClick={() => toggleEstado(row)}
+              className="p-2 border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all"
+            >
+              <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
+            </button>
+          )}
+          {puedeEliminarCat && (
+            <button
+              title="Eliminar"
+              onClick={() => handleDelete(row.id_categoria)}
+              className="p-2 border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all"
+            >
+              <Trash2 size={18} className="text-red-600" />
+            </button>
+          )}
         </div>
       )
     }
@@ -637,7 +658,7 @@ const handleSubmit = async (formData) => {
         icon={Tag}
         title="Categorías"
         subtitle="Administra las categorías registradas en el sistema."
-        action={{ label: 'Nueva Categoría', icon: Plus, onClick: () => { setEditingCategoria(null); setSelectedColor('#3B82F6'); setGenerosSeleccionados([]); setIsModalOpen(true); } }}
+        action={puedeCrearCat ? { label: 'Nueva Categoría', icon: Plus, onClick: () => { setEditingCategoria(null); setSelectedColor('#3B82F6'); setGenerosSeleccionados([]); setIsModalOpen(true); } } : null}
       />
 
       {error && (

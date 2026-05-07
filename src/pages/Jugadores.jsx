@@ -16,6 +16,7 @@ import StatCard, { StatsRow } from '../components/StatCard';
 import { toast } from 'sonner';
 import { API_BASE, SERVER_URL } from '../services/api.config.js';
 import { useAsociacion } from '../hooks/useAsociacion.js';
+import { tienePermiso } from '../utils/permissions.js';
 
 export function JugadoresPage() {
   const [jugadores, setJugadores] = useState([]);
@@ -82,7 +83,11 @@ export function JugadoresPage() {
 
   const usuario = getUsuarioLogueado();
   const rolUsuario = usuario.rol || '';
-  const usuarioId = usuario.id_usuario || usuario.id;   // 👈 aquí está el ID
+  const usuarioId = usuario.id_usuario || usuario.id;
+
+  const puedeCrearJugador  = tienePermiso(rolUsuario, 'jugadores', 'crear');
+  const puedeEditarJugador = tienePermiso(rolUsuario, 'jugadores', 'actualizar');
+  const puedeEliminarJugador = tienePermiso(rolUsuario, 'jugadores', 'eliminar');
 
   const esAdminOSecretario = ['admin', 'secretario', 'presidente'].includes(rolUsuario);
   const esClubRepresentante = ['presidenteclub', 'representante'].includes(rolUsuario);
@@ -1024,17 +1029,20 @@ const fetchCategorias = async () => {
       render: (_v, row) => {
         return (
           <div className="flex items-center gap-2">
-            <IconBtn title="Editar Jugador" onClick={() => openEditModal(row)}>
-              <Pencil size={18} />
-            </IconBtn>
-
-            <IconBtn
-              title="Eliminar Jugador"
-              onClick={() => handleDelete(row.id_jugador ?? row.id)}
-              danger
-            >
-              <Trash2 size={18} />
-            </IconBtn>
+            {puedeEditarJugador && (
+              <IconBtn title="Editar Jugador" onClick={() => openEditModal(row)}>
+                <Pencil size={18} />
+              </IconBtn>
+            )}
+            {puedeEliminarJugador && (
+              <IconBtn
+                title="Eliminar Jugador"
+                onClick={() => handleDelete(row.id_jugador ?? row.id)}
+                danger
+              >
+                <Trash2 size={18} />
+              </IconBtn>
+            )}
           </div>
         );
       }
@@ -1254,7 +1262,7 @@ const fetchCategorias = async () => {
         icon={Users}
         title="Jugadores"
         subtitle="Gestiona los jugadores del sistema."
-        action={{ label: 'Nuevo Jugador', icon: Plus, onClick: openCreateModal }}
+        action={puedeCrearJugador ? { label: 'Nuevo Jugador', icon: Plus, onClick: openCreateModal } : null}
       />
 
       {esAdminOSecretario && carnetsPendientes.length > 0 && (
@@ -1467,12 +1475,16 @@ const fetchCategorias = async () => {
 
                 {/* Acciones */}
                 <div className="px-3 pb-3 flex gap-1.5 mt-1">
-                  <button onClick={() => openEditModal(j)} title="Editar" className="flex-none p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
-                    <Pencil size={15} />
-                  </button>
-                  <button onClick={() => handleDelete(j.id_jugador ?? j.id)} title="Eliminar" className="flex-none p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
-                    <Trash2 size={15} />
-                  </button>
+                  {puedeEditarJugador && (
+                    <button onClick={() => openEditModal(j)} title="Editar" className="flex-none p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                      <Pencil size={15} />
+                    </button>
+                  )}
+                  {puedeEliminarJugador && (
+                    <button onClick={() => handleDelete(j.id_jugador ?? j.id)} title="Eliminar" className="flex-none p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                      <Trash2 size={15} />
+                    </button>
+                  )}
 
                   {puedeCrear && (
                     <button onClick={() => handleCrearCarnet(j)} className="flex-1 py-1.5 text-xs rounded-lg bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 transition-colors flex items-center justify-center gap-1">

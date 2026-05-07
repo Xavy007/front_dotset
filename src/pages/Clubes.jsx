@@ -15,6 +15,7 @@ import PageHeader from '../components/PageHeader';
 import StatCard, { StatsRow } from '../components/StatCard';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE, SERVER_URL } from '../services/api.config.js';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 export function ClubesPage() {
   const [clubes, setClubes] = useState([]);
@@ -25,6 +26,11 @@ export function ClubesPage() {
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null); // ← Para preview de imagen
   const [confirm, setConfirm] = useState({ open: false, id: null });
+
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarClub   = tienePermiso(_rol, 'club', 'actualizar');
+  const puedeEliminarClub = tienePermiso(_rol, 'club', 'eliminar');
+  const puedeCrearClub    = tienePermiso(_rol, 'club', 'crear');
 
   const API_URL = `${API_BASE}/club`;
 
@@ -125,6 +131,14 @@ export function ClubesPage() {
   // CREAR / EDITAR CLUB CON FORMDATA
   // ===============================================
   const handleSubmit = async (formData) => {
+    // Validaciones
+    if (!formData.nombre?.trim()) { toast.error('El nombre del club es obligatorio'); return; }
+    if (formData.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast.error('El correo electrónico no tiene un formato válido'); return;
+    }
+    if (formData.telefono?.trim() && formData.telefono.trim().length < 7) {
+      toast.error('El teléfono debe tener al menos 7 dígitos'); return;
+    }
     try {
       console.log('📨 FormData recibido:', formData);
 
@@ -362,22 +376,21 @@ export function ClubesPage() {
       label: 'Acciones',
       render: (_v, row) => (
         <div className="flex items-center gap-2">
-          <IconBtn title="Editar" onClick={() => { 
-            setEditingClub(row); 
-            setPreviewUrl(null);
-            setIsModalOpen(true); 
-          }}>
-            <Pencil size={18} />
-          </IconBtn>
-          <IconBtn
-            title={row.estadoBooleano ? 'Desactivar Club' : 'Activar Club'}
-            onClick={() => toggleEstado(row)}
-          >
-            <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
-          </IconBtn>
-          <IconBtn title="Eliminar Club" onClick={() => handleDelete(row.id_club)} danger>
-            <Trash2 size={18} />
-          </IconBtn>
+          {puedeEditarClub && (
+            <IconBtn title="Editar" onClick={() => { setEditingClub(row); setPreviewUrl(null); setIsModalOpen(true); }}>
+              <Pencil size={18} />
+            </IconBtn>
+          )}
+          {puedeEditarClub && (
+            <IconBtn title={row.estadoBooleano ? 'Desactivar Club' : 'Activar Club'} onClick={() => toggleEstado(row)}>
+              <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
+            </IconBtn>
+          )}
+          {puedeEliminarClub && (
+            <IconBtn title="Eliminar Club" onClick={() => handleDelete(row.id_club)} danger>
+              <Trash2 size={18} />
+            </IconBtn>
+          )}
         </div>
       )
     }
@@ -527,7 +540,7 @@ export function ClubesPage() {
         icon={Shield}
         title="Clubes"
         subtitle="Administra los clubes registrados en el sistema."
-        action={{ label: 'Nuevo Club', icon: Plus, onClick: () => { setEditingClub(null); setPreviewUrl(null); setIsModalOpen(true); } }}
+        action={puedeCrearClub ? { label: 'Nuevo Club', icon: Plus, onClick: () => { setEditingClub(null); setPreviewUrl(null); setIsModalOpen(true); } } : null}
       />
 
       {error && (

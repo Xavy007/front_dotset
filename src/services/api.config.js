@@ -7,6 +7,25 @@
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 export const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
 
+let isRefreshing = false;
+let refreshQueue = []; // peticiones en espera mientras se refresca
+
+const processQueue = (error, token = null) => {
+  refreshQueue.forEach(({ resolve, reject }) => error ? reject(error) : resolve(token));
+  refreshQueue = [];
+};
+
+const tryRefresh = async () => {
+  const res = await fetch(`${API_BASE}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include', // envía la cookie refresh_token
+  });
+  if (!res.ok) throw new Error('refresh_failed');
+  const data = await res.json();
+  sessionStorage.setItem('token', data.token);
+  return data.token;
+};
+
 // Timeout para las peticiones
 export const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 10000;
 
@@ -59,11 +78,38 @@ export async function request(url, options = {}) {
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
 
-      // Si es 401 (no autorizado), redirigir a login
+      // 401 — intentar refrescar el access token antes de redirigir al login
       if (res.status === 401) {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('usuario');
-        window.location.href = '/';
+        if (isRefreshing) {
+          // Ya hay un refresh en curso: encolar esta petición
+          return new Promise((resolve, reject) => {
+            refreshQueue.push({ resolve, reject });
+          }).then((newToken) => {
+            options.headers = { ...options.headers, Authorization: `Bearer ${newToken}` };
+            return fetch(url, { ...options, headers: { ...options.headers, Authorization: `Bearer ${newToken}` }, signal: controller.signal });
+          });
+        }
+
+        isRefreshing = true;
+        try {
+          const newToken = await tryRefresh();
+          processQueue(null, newToken);
+          // Reintentar la petición original con el nuevo token
+          clearTimeout(timeoutId);
+          const retryRes = await fetch(url, {
+            ...options,
+            headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
+          });
+          if (!retryRes.ok) throw new Error(`Error HTTP ${retryRes.status}`);
+          return retryRes.status === 204 ? null : retryRes.json();
+        } catch {
+          processQueue(new Error('session_expired'));
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('usuario');
+          window.location.href = '/';
+        } finally {
+          isRefreshing = false;
+        }
       }
 
       throw new Error(errorData.message || `Error HTTP ${res.status}`);

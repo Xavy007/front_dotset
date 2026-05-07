@@ -7,6 +7,7 @@ import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 import { API_BASE } from '../services/api.config.js';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 export function GestionesPage() {
   const [gestiones, setGestiones] = useState([]);
@@ -15,6 +16,11 @@ export function GestionesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarGestion   = tienePermiso(_rol, 'gestiones', 'actualizar');
+  const puedeEliminarGestion = tienePermiso(_rol, 'gestiones', 'eliminar');
+  const puedeCrearGestion    = tienePermiso(_rol, 'gestiones', 'crear');
 
   const API_URL = `${API_BASE}/gestion`;
 
@@ -59,10 +65,17 @@ export function GestionesPage() {
 
   // CRUD: crear/editar
   const handleSubmit = async (formData) => {
+    if (!formData.nombre?.trim()) { toast.error('El nombre de la gestión es obligatorio'); return; }
+    const anio = Number(formData.gestion);
+    const anioActual = new Date().getFullYear();
+    if (!formData.gestion || isNaN(anio)) { toast.error('El año de gestión es obligatorio'); return; }
+    if (anio < 2000 || anio > anioActual + 5) {
+      toast.error(`El año debe estar entre 2000 y ${anioActual + 5}`); return;
+    }
     try {
       const body = {
-        nombre: formData.nombre,
-        gestion: formData.gestion ? Number(formData.gestion) : '',
+        nombre: formData.nombre.trim(),
+        gestion: anio,
         descripcion: formData.descripcion || null,
         estado: formData.estado === 'true' || formData.estado === true,
       };
@@ -168,15 +181,21 @@ export function GestionesPage() {
       label: 'Acciones',
       render: (_v, row) => (
         <div className="flex items-center gap-2">
-          <IconBtn title="Editar" onClick={() => { setEditingGestion(row); setIsModalOpen(true); }}>
-            <Pencil size={18} />
-          </IconBtn>
-          <IconBtn title={row.estadoBooleano ? 'Desactivar Gestión' : 'Activar Gestión'} onClick={() => toggleEstado(row)}>
-            <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
-          </IconBtn>
-          <IconBtn title="Eliminar Gestión" onClick={() => handleDelete(row.id_gestion)} danger>
-            <Trash2 size={18} />
-          </IconBtn>
+          {puedeEditarGestion && (
+            <IconBtn title="Editar" onClick={() => { setEditingGestion(row); setIsModalOpen(true); }}>
+              <Pencil size={18} />
+            </IconBtn>
+          )}
+          {puedeEditarGestion && (
+            <IconBtn title={row.estadoBooleano ? 'Desactivar Gestión' : 'Activar Gestión'} onClick={() => toggleEstado(row)}>
+              <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
+            </IconBtn>
+          )}
+          {puedeEliminarGestion && (
+            <IconBtn title="Eliminar Gestión" onClick={() => handleDelete(row.id_gestion)} danger>
+              <Trash2 size={18} />
+            </IconBtn>
+          )}
         </div>
       ),
     }
@@ -229,12 +248,14 @@ export function GestionesPage() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button
-          onClick={() => { setEditingGestion(null); setIsModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus size={20} /> Nueva Gestión
-        </button>
+        {puedeCrearGestion && (
+          <button
+            onClick={() => { setEditingGestion(null); setIsModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus size={20} /> Nueva Gestión
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">

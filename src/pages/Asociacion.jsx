@@ -130,73 +130,79 @@ export function AsociacionPage() {
     <div>
       <PageHeader icon={Building2} title="Asociación" subtitle="Datos institucionales de la asociación." />
 
-      <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* Logo */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Logo de la asociación</h3>
-          <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
-              ) : (
-                <Building2 size={32} className="text-gray-300" />
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
-              <button type="button" onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                <Upload size={16} /> Subir logo
-              </button>
-              {(logoPreview || logoActual) && (
-                <button type="button" onClick={handleRemoveLogo}
-                  className="flex items-center gap-2 px-4 py-2 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">
-                  <X size={16} /> Quitar logo
+        {/* Fila superior: Logo + Datos generales */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Logo */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Logo de la asociación</h3>
+            <div className="flex flex-col items-center gap-4 flex-1 justify-center">
+              <div className="w-36 h-36 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                ) : (
+                  <Building2 size={40} className="text-gray-300" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2 w-full">
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors w-full">
+                  <Upload size={16} /> Subir logo
                 </button>
-              )}
-              <p className="text-xs text-gray-400">PNG, JPG — máx. 5 MB</p>
+                {(logoPreview || logoActual) && (
+                  <button type="button" onClick={handleRemoveLogo}
+                    className="flex items-center justify-center gap-2 px-4 py-2 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors w-full">
+                    <X size={16} /> Quitar logo
+                  </button>
+                )}
+                <p className="text-xs text-gray-400 text-center">PNG, JPG — máx. 5 MB</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Datos generales */}
+          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Datos generales</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Field label="Nombre oficial" name="nombre" required placeholder="Ej: Asociación Municipal de Voleibol de Sucre" />
+              </div>
+              <Field label="Acrónimo" name="acronimo" placeholder="Ej: AMVS" />
+              <Field label="Federación" name="federacion" placeholder="Ej: Federación Boliviana de Voleibol" />
+              <Field label="Ciudad" name="ciudad" placeholder="Ej: Sucre" />
+              <Field label="Departamento" name="departamento" placeholder="Ej: Chuquisaca" />
+              <div className="sm:col-span-2">
+                <Field label="Dirección" name="direccion" placeholder="Ej: Av. Venezuela Nº 123" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Datos generales */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Datos generales</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <Field label="Nombre oficial" name="nombre" required placeholder="Ej: Asociación Municipal de Voleibol de Sucre" />
-            </div>
-            <Field label="Acrónimo" name="acronimo" placeholder="Ej: AMVS" />
-            <Field label="Federación" name="federacion" placeholder="Ej: Federación Boliviana de Voleibol" />
-            <Field label="Ciudad" name="ciudad" placeholder="Ej: Sucre" />
-            <Field label="Departamento" name="departamento" placeholder="Ej: Chuquisaca" />
-            <div className="sm:col-span-2">
-              <Field label="Dirección" name="direccion" placeholder="Ej: Av. Venezuela Nº 123" />
-            </div>
-          </div>
-        </div>
-
-        {/* Contacto */}
+        {/* Fila inferior: Contacto ocupa todo el ancho */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Contacto</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Field label="Teléfono" name="telefono" type="tel" placeholder="Ej: +591 4 6451234" />
             <Field label="Correo electrónico" name="email" type="email" placeholder="Ej: contacto@amvs.bo" />
             <div className="sm:col-span-2">
               <Field label="Sitio web" name="sitio_web" type="url" placeholder="Ej: https://amvs.bo" />
             </div>
-            <div className="sm:col-span-2">
+            <div className="lg:col-span-4">
               <Field label="Descripción" name="descripcion" textarea placeholder="Breve descripción de la asociación..." />
             </div>
           </div>
         </div>
 
-        <button type="submit" disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-60 transition-colors">
-          <Save size={18} />
-          {saving ? 'Guardando...' : 'Guardar cambios'}
-        </button>
+        <div className="flex justify-end">
+          <button type="submit" disabled={saving}
+            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium shadow-md shadow-blue-200 disabled:opacity-60 transition-all">
+            <Save size={18} />
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
       </form>
     </div>
   );

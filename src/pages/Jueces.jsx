@@ -13,6 +13,7 @@ import PageHeader from '../components/PageHeader';
 import StatCard, { StatsRow } from '../components/StatCard';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE } from '../services/api.config';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 // AJUSTA ESTAS URLs A TU BACKEND
 const API_URL_JUEZ = `${API_BASE}/jueces`;
@@ -135,6 +136,11 @@ export function JuecesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [confirm, setConfirm] = useState({ open: false, id: null });
 
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarJuez   = tienePermiso(_rol, 'jueces', 'actualizar');
+  const puedeEliminarJuez = tienePermiso(_rol, 'jueces', 'eliminar');
+  const puedeCrearJuez    = tienePermiso(_rol, 'jueces', 'crear');
+
   const fetchJueces = async () => {
     setLoading(true);
     setError(null);
@@ -256,10 +262,16 @@ export function JuecesPage() {
   };
 
   const handleCreateJuez = async (formData) => {
+    if (!formData.ci?.trim()) { toast.error('La cédula de identidad es obligatoria'); return; }
+    if (!formData.nombre?.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (!formData.ap?.trim()) { toast.error('El apellido paterno es obligatorio'); return; }
+    if (!formData.juez_categoria) { toast.error('Debes seleccionar la categoría del juez'); return; }
+    if (!formData.grado) { toast.error('Debes seleccionar el grado del juez'); return; }
+    if (!formData.estado_juez) { toast.error('Debes seleccionar el estado del juez'); return; }
     try {
       const bodyData = {
         persona: {
-          ci: formData.ci,
+          ci: formData.ci.trim(),
           nombre: formData.nombre,
           ap: formData.ap,
           am: formData.am || null,
@@ -308,6 +320,11 @@ export function JuecesPage() {
   };
 
   const handleEditJuez = async (formData) => {
+    if (!formData.nombre?.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (!formData.ap?.trim()) { toast.error('El apellido paterno es obligatorio'); return; }
+    if (!formData.juez_categoria) { toast.error('Debes seleccionar la categoría del juez'); return; }
+    if (!formData.grado) { toast.error('Debes seleccionar el grado del juez'); return; }
+    if (!formData.estado_juez) { toast.error('Debes seleccionar el estado del juez'); return; }
     try {
       if (!editingJuez?.id_persona || !editingJuez?.id_juez) {
         throw new Error('No se puede editar: juez o persona no encontrados');
@@ -465,20 +482,24 @@ export function JuecesPage() {
       label: 'Acciones',
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <button
-            title="Editar Juez"
-            onClick={() => openEditModal(row)}
-            className="p-2 rounded-md border hover:bg-gray-50"
-          >
-            ✏️
-          </button>
-          <button
-            title="Eliminar Juez"
-            onClick={() => handleDelete(row.id_juez ?? row.id)}
-            className="p-2 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-          >
-            🗑️
-          </button>
+          {puedeEditarJuez && (
+            <button
+              title="Editar Juez"
+              onClick={() => openEditModal(row)}
+              className="p-2 rounded-md border hover:bg-gray-50"
+            >
+              ✏️
+            </button>
+          )}
+          {puedeEliminarJuez && (
+            <button
+              title="Eliminar Juez"
+              onClick={() => handleDelete(row.id_juez ?? row.id)}
+              className="p-2 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+            >
+              🗑️
+            </button>
+          )}
         </div>
       )
     }
@@ -700,13 +721,15 @@ export function JuecesPage() {
           </div>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={20} />
-          Nuevo Juez
-        </button>
+        {puedeCrearJuez && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={20} />
+            Nuevo Juez
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

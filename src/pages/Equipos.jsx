@@ -15,6 +15,7 @@ import PageHeader from '../components/PageHeader';
 import StatCard, { StatsRow } from '../components/StatCard';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE } from '../services/api.config.js';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 export function EquiposPage() {
   const [equipos, setEquipos] = useState([]);
@@ -25,6 +26,11 @@ export function EquiposPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarEquipo   = tienePermiso(_rol, 'equipos', 'actualizar');
+  const puedeEliminarEquipo = tienePermiso(_rol, 'equipos', 'eliminar');
+  const puedeCrearEquipo    = tienePermiso(_rol, 'equipos', 'crear');
 
   // Estados para gestión de plantilla
   const [isGestionarPlantillaOpen, setIsGestionarPlantillaOpen] = useState(false);
@@ -176,9 +182,12 @@ export function EquiposPage() {
   // CREAR / EDITAR EQUIPO
   // ===============================================
   const handleSubmit = async (formData) => {
+    if (!formData.nombre?.trim()) { toast.error('El nombre del equipo es obligatorio'); return; }
+    if (!formData.id_club) { toast.error('Debes seleccionar un club'); return; }
+    if (!formData.id_categoria) { toast.error('Debes seleccionar una categoría'); return; }
     try {
       const body = {
-        nombre: formData.nombre,
+        nombre: formData.nombre.trim(),
         id_club: Number(formData.id_club),
         id_categoria: Number(formData.id_categoria),
         estado: formData.estado === 'true' || formData.estado === true,
@@ -476,20 +485,21 @@ export function EquiposPage() {
             <Users size={18} />
           </IconBtn>
 
-          <IconBtn title="Editar" onClick={() => { setEditingEquipo(row); setIsModalOpen(true); }}>
-            <Pencil size={18} />
-          </IconBtn>
-
-          <IconBtn
-            title={row.estadoBooleano ? 'Desactivar Equipo' : 'Activar Equipo'}
-            onClick={() => toggleEstado(row)}
-          >
-            <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
-          </IconBtn>
-
-          <IconBtn title="Eliminar Equipo" onClick={() => handleDelete(row.id_equipo)} danger>
-            <Trash2 size={18} />
-          </IconBtn>
+          {puedeEditarEquipo && (
+            <IconBtn title="Editar" onClick={() => { setEditingEquipo(row); setIsModalOpen(true); }}>
+              <Pencil size={18} />
+            </IconBtn>
+          )}
+          {puedeEditarEquipo && (
+            <IconBtn title={row.estadoBooleano ? 'Desactivar Equipo' : 'Activar Equipo'} onClick={() => toggleEstado(row)}>
+              <Power size={18} className={row.estadoBooleano ? 'text-green-600' : 'text-gray-400'} />
+            </IconBtn>
+          )}
+          {puedeEliminarEquipo && (
+            <IconBtn title="Eliminar Equipo" onClick={() => handleDelete(row.id_equipo)} danger>
+              <Trash2 size={18} />
+            </IconBtn>
+          )}
         </div>
       )
     }
@@ -593,7 +603,7 @@ export function EquiposPage() {
         icon={Shield}
         title="Equipos"
         subtitle="Gestiona los equipos registrados en el sistema."
-        action={{ label: 'Nuevo Equipo', icon: Plus, onClick: () => { setEditingEquipo(null); setIsModalOpen(true); } }}
+        action={puedeCrearEquipo ? { label: 'Nuevo Equipo', icon: Plus, onClick: () => { setEditingEquipo(null); setIsModalOpen(true); } } : null}
       />
 
       {error && (

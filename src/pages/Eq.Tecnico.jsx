@@ -10,6 +10,7 @@ import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 
 import { API_BASE } from '../services/api.config.js';
+import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
 
 // AJUSTADAS AL NUEVO BACKEND
 const API_URL_EQTECNICO = `${API_BASE}/eqtecnico`;
@@ -151,6 +152,11 @@ export function EqTecnicoPage() {
   const [tecnicos, setTecnicos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const _rol = getUsuarioActual()?.rol || '';
+  const puedeEditarTecnico   = tienePermiso(_rol, 'eqtecnico', 'actualizar');
+  const puedeEliminarTecnico = tienePermiso(_rol, 'eqtecnico', 'eliminar');
+  const puedeCrearTecnico    = tienePermiso(_rol, 'eqtecnico', 'crear');
 
   const [nacionalidades, setNacionalidades] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
@@ -409,8 +415,12 @@ export function EqTecnicoPage() {
   };
 
   const handleCreateTecnico = async (formData) => {
+    if (!formData.ci?.trim()) { toast.error('La cédula de identidad es obligatoria'); return; }
+    if (!formData.nombre?.trim()) { toast.error('El nombre es obligatorio'); return; }
+    if (!formData.ap?.trim()) { toast.error('El apellido paterno es obligatorio'); return; }
+    if (!formData.id_club) { toast.error('Debes seleccionar un club'); return; }
+    if (!formData.rol) { toast.error('Debes seleccionar el rol del técnico'); return; }
     try {
-      if (!formData.id_club) throw new Error('Debe seleccionar un club');
 
       const bodyData = {
         id_club: Number(formData.id_club),
@@ -457,6 +467,10 @@ export function EqTecnicoPage() {
   };
 
 const handleEditTecnico = async (formData) => {
+  if (!formData.nombre?.trim()) { toast.error('El nombre es obligatorio'); return; }
+  if (!formData.ap?.trim()) { toast.error('El apellido paterno es obligatorio'); return; }
+  if (!formData.id_club) { toast.error('Debes seleccionar un club'); return; }
+  if (!formData.rol) { toast.error('Debes seleccionar el rol del técnico'); return; }
   try {
     if (!editingTecnico?.id_persona || !editingTecnico?.id_eqtecnico) {
       throw new Error('No se puede editar: técnico o persona no encontrados');
@@ -630,20 +644,24 @@ const handleEditTecnico = async (formData) => {
       label: 'Acciones',
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <button
-            title="Editar"
-            onClick={() => openEditModal(row)}
-            className="p-2 rounded-md border hover:bg-gray-50"
-          >
-            ✏️
-          </button>
-          <button
-            title="Eliminar"
-            onClick={() => handleDelete(row.id_eqtecnico ?? row.id)}
-            className="p-2 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-          >
-            🗑️
-          </button>
+          {puedeEditarTecnico && (
+            <button
+              title="Editar"
+              onClick={() => openEditModal(row)}
+              className="p-2 rounded-md border hover:bg-gray-50"
+            >
+              ✏️
+            </button>
+          )}
+          {puedeEliminarTecnico && (
+            <button
+              title="Eliminar"
+              onClick={() => handleDelete(row.id_eqtecnico ?? row.id)}
+              className="p-2 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+            >
+              🗑️
+            </button>
+          )}
         </div>
       ),
     },
@@ -868,13 +886,15 @@ const handleEditTecnico = async (formData) => {
           </div>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={20} />
-          Nuevo integrante
-        </button>
+        {puedeCrearTecnico && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={20} />
+            Nuevo integrante
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
