@@ -131,7 +131,7 @@ export default function VoleibolStatsGrid() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-8">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
             <div className="flex items-center justify-between">
@@ -148,18 +148,18 @@ export default function VoleibolStatsGrid() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-8">
       {statsData.map((stat, index) => {
         const Icon = stat.icon;
         return (
           <div
             key={index}
-            className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200"
+            className="bg-white rounded-xl shadow-sm p-4 lg:p-6 hover:shadow-md transition-shadow duration-200"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600 mb-1 truncate">{stat.title}</p>
+                <p className="text-2xl lg:text-3xl font-bold text-gray-900">{stat.value}</p>
               </div>
               <div className={`${stat.bgLight} p-3 rounded-lg`}>
                 <Icon className={`w-6 h-6 ${stat.textColor}`} />

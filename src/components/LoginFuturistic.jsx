@@ -306,7 +306,8 @@ export default function LoginFuturistic() {
                 <input type="checkbox" className="size-4 accent-[--color-neon]" disabled={isBlocked || loading} />
                 Recuérdame
               </label>
-              <button type="button" className="text-[--color-neon-2] hover:underline" disabled={isBlocked || loading}>
+              <button type="button" onClick={() => navigate('/reset')}
+                className="text-[--color-neon-2] hover:underline" disabled={isBlocked || loading}>
                 ¿Olvidaste tu contraseña?
               </button>
             </div>

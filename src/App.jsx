@@ -3,42 +3,59 @@
 // CONFIGURACIÓN DE RUTAS CON PROTECCIÓN
 // ===============================================
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import LoginFuturistic from './components/LoginFuturistic';
+import SetupPage from './components/SetupPage';
+import ActivarCuenta from './components/ActivarCuenta';
 import { ProtectedRoute } from './Security/ProtectedRoute';
 import { isAuthenticated } from './utils/auth';
 import './index.css';
 
+const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
 export default function App() {
+  const [inicializado, setInicializado] = useState(null);
+  const activarMatch = window.location.pathname.match(/^\/activar\/(.+)$/);
+  console.log('[App] pathname:', window.location.pathname, '| activarMatch:', activarMatch);
+
+  useEffect(() => {
+    if (activarMatch) return; // no necesitamos verificar inicialización en esta ruta
+    fetch(`${API}/asociacion/estado`)
+      .then((r) => r.json())
+      .then((data) => setInicializado(data.inicializado ?? true))
+      .catch(() => setInicializado(true));
+  }, []);
+
+  // Ruta de activación: bypasea router y verificación de asociación
+  if (activarMatch) {
+    return <ActivarCuenta token={activarMatch[1]} />;
+  }
+
+  if (inicializado === null) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0c29' }}>
+        <span style={{ color: '#fff', fontSize: '1.1rem' }}>Cargando...</span>
+      </div>
+    );
+  }
+
+  if (!inicializado) {
+    return <SetupPage onComplete={() => setInicializado(true)} />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Ruta pública - Login (/) */}
-        <Route 
-          path="/" 
-          element={
-            // Si ya está autenticado, redirigir al dashboard
-            isAuthenticated() ? (
-              <Navigate to="/app" replace />
-            ) : (
-              <LoginFuturistic />
-            )
-          } 
+        <Route
+          path="/"
+          element={isAuthenticated() ? <Navigate to="/app" replace /> : <LoginFuturistic />}
         />
-
-        {/* Ruta protegida - Dashboard (/app) */}
         <Route
           path="/app"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
         />
-
-        {/* Ruta 404 - Cualquier otra ruta redirige al login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

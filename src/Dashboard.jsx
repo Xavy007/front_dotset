@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
+import { handleLogout } from './utils/auth';
 
 // Importar nuevos componentes del dashboard
 import VoleibolStatsGrid from './components/Voleibolstatsgrid';
@@ -36,9 +37,9 @@ import { AsociacionPage } from './pages/Asociacion';
 function DashboardPage() {
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Resumen general del sistema de gestión de voleibol</p>
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-600 mt-1">Resumen general del sistema de gestión de voleibol</p>
       </div>
 
       {/* Estadísticas principales */}
@@ -61,12 +62,27 @@ function DashboardPage() {
 }
 
 export default function Dashboard() {
-  // Estados
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const isMobileWidth = () => window.innerWidth < 1024;
+
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobileWidth());
+  const [isMobile, setIsMobile] = useState(isMobileWidth());
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [userName, setUserName] = useState(''); 
-  const [userRol, setUserRol] = useState(''); 
-  
+  const [userName, setUserName] = useState('');
+  const [userRol, setUserRol] = useState('');
+  const [usuario, setUsuario] = useState(null);
+
+  // Ajustar sidebar al cambiar tamaño de pantalla
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = isMobileWidth();
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+      else setSidebarOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     const raw = sessionStorage.getItem('usuario');
     const rol = raw ? JSON.parse(raw).rol : null;
@@ -74,7 +90,8 @@ export default function Dashboard() {
     if (raw) {
       try {
         const userObject = JSON.parse(raw);
-        setUserName(userObject.name || 'Usuario');
+        setUsuario(userObject);
+        setUserName(userObject.nombre || userObject.name || 'Usuario');
       } catch (error) {
         console.error('Error al parsear usuario:', error);
         setUserName('Usuario');
@@ -83,6 +100,11 @@ export default function Dashboard() {
       setUserName('Invitado');
     }
   }, []);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    if (isMobile) setSidebarOpen(false);
+  };
 
   // Renderizar la página actual
   const renderPage = () => {
@@ -134,27 +156,36 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+
+      {/* Backdrop para móvil */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
+        isMobile={isMobile}
         currentPage={currentPage}
-        onPageChange={setCurrentPage}
-        className="lg:w-64 w-16"
-        userRol={userRol} 
+        onPageChange={handlePageChange}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        userRol={userRol}
       />
 
       {/* Contenido principal */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
         <Header
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          userName={userName}
+          usuario={usuario}
+          onLogout={handleLogout}
         />
 
         {/* Contenido de la página */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 lg:p-6">
           {renderPage()}
         </main>
       </div>

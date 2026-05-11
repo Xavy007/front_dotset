@@ -4,8 +4,207 @@
 // ===============================================
 
 import React, { useState, useEffect } from 'react';
-import { Printer, Download, RefreshCw, Search, ArrowLeft, Loader2 } from 'lucide-react';
+import { Printer, Download, RefreshCw, Search, ArrowLeft, Loader2, ClipboardList } from 'lucide-react';
 import { planillaService } from '../services/planillaService';
+import { API_BASE } from '../services/api.config';
+
+// ──────────────────────────────────────────────────────────
+// Selector de partido (pantalla inicial)
+// ──────────────────────────────────────────────────────────
+function SelectorPartido({ idPartido, setIdPartido, onCargar, onCargarId, loading, error }) {
+  const [campeonatos, setCampeonatos]         = useState([]);
+  const [idCampeonatoSel, setIdCampeonatoSel] = useState('');
+  const [partidos, setPartidos]               = useState([]);
+  const [cargandoCamp, setCargandoCamp]       = useState(false);
+  const [cargandoPartidos, setCargandoPartidos] = useState(false);
+  const [busqueda, setBusqueda]               = useState('');
+
+  const headers = () => {
+    const token = sessionStorage.getItem('token');
+    return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  };
+
+  // Cargar lista de campeonatos al montar
+  useEffect(() => {
+    const cargar = async () => {
+      setCargandoCamp(true);
+      try {
+        const res  = await fetch(`${API_BASE}/campeonato`, { headers: headers() });
+        const data = await res.json();
+        const lista = Array.isArray(data) ? data : (data.data || data.campeonatos || []);
+        setCampeonatos(lista);
+      } catch (e) {
+        console.error('Error cargando campeonatos:', e);
+      } finally {
+        setCargandoCamp(false);
+      }
+    };
+    cargar();
+  }, []);
+
+  // Cargar partidos cuando cambia el campeonato seleccionado
+  useEffect(() => {
+    if (!idCampeonatoSel) { setPartidos([]); return; }
+    const cargar = async () => {
+      setCargandoPartidos(true);
+      try {
+        const res  = await fetch(`${API_BASE}/fixture/campeonato/${idCampeonatoSel}/todos`, { headers: headers() });
+        const data = await res.json();
+        // el endpoint retorna { success, data: { partidos: [...] } }
+        const lista = data.data?.partidos || data.data || [];
+        setPartidos(lista);
+      } catch (e) {
+        console.error('Error cargando partidos:', e);
+        setPartidos([]);
+      } finally {
+        setCargandoPartidos(false);
+      }
+    };
+    cargar();
+  }, [idCampeonatoSel]);
+
+  const filtrados = partidos.filter(p => {
+    const txt   = busqueda.toLowerCase();
+    const local = p.equipoLocal?.nombre  || '';
+    const visit = p.equipoVisitante?.nombre || '';
+    return local.toLowerCase().includes(txt) || visit.toLowerCase().includes(txt) || String(p.id_partido).includes(txt);
+  });
+
+  const estadoChip = (estado) => {
+    switch (estado) {
+      case 'finalizado': return 'bg-green-100 text-green-700';
+      case 'en_juego':   return 'bg-blue-100 text-blue-700';
+      case 'programado': return 'bg-gray-100 text-gray-500';
+      default:           return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const formatFecha = (fechaHora) => {
+    if (!fechaHora) return 'Sin fecha';
+    const d = new Date(fechaHora);
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+         + ' ' + d.toTimeString().slice(0, 5);
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <ClipboardList size={28} className="text-blue-600" />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Planilla FIVB</h1>
+          <p className="text-sm text-gray-500">Selecciona el campeonato y el partido</p>
+        </div>
+      </div>
+
+      {/* Paso 1: Campeonato */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+        <p className="text-sm font-semibold text-gray-700 mb-2">1. Seleccionar Campeonato</p>
+        {cargandoCamp ? (
+          <div className="flex items-center gap-2 text-gray-400 text-sm py-1">
+            <Loader2 className="animate-spin" size={16} /> Cargando campeonatos...
+          </div>
+        ) : (
+          <select
+            value={idCampeonatoSel}
+            onChange={(e) => { setIdCampeonatoSel(e.target.value); setBusqueda(''); }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          >
+            <option value="">— Elige un campeonato —</option>
+            {campeonatos.map(c => (
+              <option key={c.id_campeonato} value={c.id_campeonato}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Paso 2: Lista de partidos */}
+      {idCampeonatoSel && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-4">
+          <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+            <p className="text-sm font-semibold text-gray-700 flex-1">2. Seleccionar Partido</p>
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar equipo..."
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm w-44 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {cargandoPartidos ? (
+            <div className="flex items-center justify-center py-10 gap-2 text-gray-400">
+              <Loader2 className="animate-spin" size={18} />
+              <span className="text-sm">Cargando partidos...</span>
+            </div>
+          ) : filtrados.length === 0 ? (
+            <div className="py-10 text-center text-sm text-gray-400">
+              {partidos.length === 0 ? 'No hay partidos en este campeonato' : 'Sin resultados'}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-[380px] overflow-y-auto">
+              {filtrados.map((p) => (
+                <button
+                  key={p.id_partido}
+                  onClick={() => onCargarId(String(p.id_partido))}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left"
+                >
+                  <span className="text-xs font-mono text-gray-400 w-8 shrink-0 text-center">#{p.id_partido}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-800 truncate">
+                      {p.equipoLocal?.nombre || '—'}
+                      <span className="text-gray-400 font-normal mx-1">vs</span>
+                      {p.equipoVisitante?.nombre || '—'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5 flex gap-2 flex-wrap">
+                      <span>{formatFecha(p.fecha_hora)}</span>
+                      {p.cancha?.nombre && <span>· {p.cancha.nombre}</span>}
+                      {p.campeonatoCategoria?.categoria?.nombre && <span>· {p.campeonatoCategoria.categoria.nombre}</span>}
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${estadoChip(p.p_estado)}`}>
+                    {p.p_estado}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Acceso rápido por ID (colapsado) */}
+      <details className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <summary className="px-4 py-3 text-sm text-gray-500 cursor-pointer select-none hover:text-gray-700">
+          Ingresar ID de partido manualmente
+        </summary>
+        <div className="px-4 pb-4 pt-2 flex gap-2">
+          <input
+            type="number"
+            value={idPartido}
+            onChange={(e) => setIdPartido(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onCargar()}
+            placeholder="Ej: 1, 2, 3..."
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          />
+          <button
+            onClick={onCargar}
+            disabled={loading}
+            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+          >
+            {loading ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+            {loading ? 'Cargando...' : 'Cargar'}
+          </button>
+        </div>
+        {error && (
+          <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+      </details>
+    </div>
+  );
+}
 
 export function PlanillaFIVB() {
   // Estados
@@ -72,6 +271,24 @@ export function PlanillaFIVB() {
   });
 
   const [observaciones, setObservaciones] = useState('');
+  const [zoom, setZoom] = useState(1);
+
+  // Bloquear scroll del body cuando la planilla está activa + calcular zoom inicial
+  useEffect(() => {
+    if (!mostrarPlanilla) return;
+    const hojaW = 297 * 3.78; // ~1123px
+    const zoomInicial = Math.round(Math.min(1, (window.innerWidth - 40) / hojaW) * 10) / 10;
+    setZoom(Math.max(0.7, zoomInicial)); // mínimo 70% para que no sea ilegible
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [mostrarPlanilla]);
+
+  const zoomIn  = () => setZoom(z => Math.min(1.5, +( z + 0.1).toFixed(1)));
+  const zoomOut = () => setZoom(z => Math.max(0.5, +( z - 0.1).toFixed(1)));
+  const zoomReset = () => {
+    const hojaW = 297 * 3.78;
+    setZoom(Math.max(0.7, Math.round(Math.min(1, (window.innerWidth - 40) / hojaW) * 10) / 10));
+  };
 
   // Helper para crear set vacío
   function createEmptySet(numero, saqueInicial) {
@@ -99,9 +316,10 @@ export function PlanillaFIVB() {
     }));
   }
 
-  // Cargar datos del partido
-  const cargarPartido = async () => {
-    if (!idPartido) {
+  // Cargar datos del partido (idOverride permite pasar el ID directamente desde la lista)
+  const cargarPartido = async (idOverride) => {
+    const idFinal = idOverride || idPartido;
+    if (!idFinal) {
       setError('Ingrese un ID de partido');
       return;
     }
@@ -110,113 +328,121 @@ export function PlanillaFIVB() {
     setError(null);
 
     try {
-      // Intentar cargar desde MongoDB
+      if (idOverride) setIdPartido(idOverride);
+
       const [partidoDigital, infoPostgres] = await Promise.all([
-        planillaService.getPartidoDigital(idPartido).catch(() => null),
-        planillaService.getInfoPartidoPostgres(idPartido).catch(() => null),
+        planillaService.getPartidoDigital(idFinal).catch(() => null),
+        planillaService.getInfoPartidoPostgres(idFinal).catch(() => null),
       ]);
 
-      console.log('Partido Digital:', partidoDigital);
-      console.log('Info PostgreSQL:', infoPostgres);
+      const pg   = infoPostgres?.data  || {};
+      const mongo = partidoDigital?.data || {};
 
-      // Procesar datos del partido
-      if (infoPostgres?.data || partidoDigital?.data) {
-        const pg = infoPostgres?.data || {};
-        const mongo = partidoDigital?.data || {};
+      console.log('📋 Postgres (fixture):', pg);
+      console.log('📋 MongoDB (digital):', mongo);
 
-        // Datos generales
-        setDatosPartido({
-          competicion: pg.campeonato?.nombre || mongo.info_general?.campeonato || '',
-          ciudad: pg.cancha?.ciudad || '',
-          codigo: pg.id_partido || idPartido,
-          lugar: pg.cancha?.nombre || '',
-          partidoNum: pg.numero_partido || idPartido,
-          division: pg.categoria?.genero === 'F' ? 'F' : 'M',
-          categoria: 'Sen',
-          fecha: pg.p_fecha || mongo.info_general?.hora_inicio_real || '',
-          hora: pg.p_hora || '',
-          equipoA: {
-            nombre: pg.equipo_local?.nombre || mongo.equipos?.local?.nombre || 'Equipo A',
-            abreviatura: 'A',
-          },
-          equipoB: {
-            nombre: pg.equipo_visitante?.nombre || mongo.equipos?.visitante?.nombre || 'Equipo B',
-            abreviatura: 'B',
-          },
-        });
-
-        // Procesar sets si hay datos en MongoDB
-        if (mongo.resultado) {
-          const setsLocal = mongo.resultado.sets_local || 0;
-          const setsVisitante = mongo.resultado.sets_visitante || 0;
-
-          setResultados((prev) => ({
-            ...prev,
-            ganador: setsLocal > setsVisitante ? datosPartido.equipoA.nombre : datosPartido.equipoB.nombre,
-            marcadorFinal: `${setsLocal} : ${setsVisitante}`,
-            totalA: { ...prev.totalA, g: setsLocal },
-            totalB: { ...prev.totalB, g: setsVisitante },
-          }));
-        }
-
-        // Cargar eventos para llenar los puntos
-        try {
-          const eventos = await planillaService.getEventosPartido(idPartido);
-          if (eventos?.data && Array.isArray(eventos.data)) {
-            procesarEventos(eventos.data);
-          }
-        } catch (e) {
-          console.log('No se pudieron cargar eventos:', e);
-        }
-
-        setPartidoCargado(true);
-        setMostrarPlanilla(true);
-      } else {
-        setError('No se encontraron datos para este partido');
+      if (!infoPostgres?.data && !partidoDigital?.data) {
+        setError('No se encontraron datos para este partido. Verifique que el ID es correcto y que el partido existe.');
+        return;
       }
+
+      // Construir nombres localmente para evitar estado stale
+      const nombreA = pg.equipo_local?.nombre     || mongo.equipos?.local?.nombre     || 'Equipo A';
+      const nombreB = pg.equipo_visitante?.nombre  || mongo.equipos?.visitante?.nombre || 'Equipo B';
+
+      setDatosPartido({
+        competicion: pg.campeonato?.nombre           || mongo.info_general?.campeonato || '',
+        ciudad:      pg.cancha?.ciudad               || '',
+        codigo:      pg.id_partido                   || idPartido,
+        lugar:       pg.cancha?.nombre               || '',
+        partidoNum:  pg.numero_partido               || idPartido,
+        division:    pg.categoria?.genero === 'F' ? 'F' : 'M',
+        categoria:   'Sen',
+        fecha:       pg.fecha_partido                || mongo.info_general?.hora_inicio_real || '',
+        hora:        pg.hora_partido                 || '',
+        equipoA: { nombre: nombreA, abreviatura: 'A' },
+        equipoB: { nombre: nombreB, abreviatura: 'B' },
+      });
+
+      // Árbitros desde PostgreSQL
+      if (pg.arbitros) {
+        setArbitros({
+          primero:   pg.arbitros.primero   || '',
+          segundo:   pg.arbitros.segundo   || '',
+          anotador:  pg.arbitros.anotador  || '',
+          capA: '',
+          capB: '',
+        });
+      }
+
+      // Sets y marcador final
+      const setsLocal      = pg.sets_local      ?? mongo.resultado?.sets_local      ?? 0;
+      const setsVisitante  = pg.sets_visitante  ?? mongo.resultado?.sets_visitante  ?? 0;
+      const marcadorLocal  = pg.marcador_local  ?? 0;
+      const marcadorVisit  = pg.marcador_visitante ?? 0;
+
+      // Procesar eventos de puntos (sin closure stale: construir sets frescos)
+      let setsActualizados = [
+        createEmptySet(1, 'A'),
+        createEmptySet(2, 'B'),
+        createEmptySet(3, 'A'),
+        createEmptySet(4, 'B'),
+        createEmptySet(5, 'A'),
+      ];
+
+      try {
+        const eventos = await planillaService.getEventosPartido(idFinal);
+        if (eventos?.data && Array.isArray(eventos.data)) {
+          eventos.data.forEach((evento) => {
+            if (evento.tipo_evento === 'punto' && evento.marcador) {
+              const setIdx = (evento.numero_set || 1) - 1;
+              if (setIdx >= 0 && setIdx < 5) {
+                const equipo  = evento.punto?.resultado?.equipo_anota;
+                const marcador = evento.marcador;
+                if (equipo === 'local') {
+                  if (!setsActualizados[setIdx].puntosTachadosA.includes(marcador.local))
+                    setsActualizados[setIdx].puntosTachadosA.push(marcador.local);
+                  setsActualizados[setIdx].puntajeFinalA = Math.max(setsActualizados[setIdx].puntajeFinalA, marcador.local);
+                } else if (equipo === 'visitante') {
+                  if (!setsActualizados[setIdx].puntosTachadosB.includes(marcador.visitante))
+                    setsActualizados[setIdx].puntosTachadosB.push(marcador.visitante);
+                  setsActualizados[setIdx].puntajeFinalB = Math.max(setsActualizados[setIdx].puntajeFinalB, marcador.visitante);
+                }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.log('No se pudieron cargar eventos:', e);
+      }
+
+      setSets(setsActualizados);
+
+      // Actualizar resultados incluyendo marcadores por set
+      setResultados((prev) => {
+        const nuevosSets = prev.sets.map((s, idx) => ({
+          ...s,
+          gA: setsActualizados[idx].puntajeFinalA || '',
+          gB: setsActualizados[idx].puntajeFinalB || '',
+        }));
+        return {
+          ...prev,
+          sets: nuevosSets,
+          ganador:       setsLocal > setsVisitante ? nombreA : setsVisitante > setsLocal ? nombreB : '',
+          marcadorFinal: setsLocal || setsVisitante ? `${setsLocal} : ${setsVisitante}` : '',
+          totalA: { ...prev.totalA, g: setsLocal,     s: marcadorLocal },
+          totalB: { ...prev.totalB, g: setsVisitante, s: marcadorVisit },
+        };
+      });
+
+      setPartidoCargado(true);
+      setMostrarPlanilla(true);
     } catch (err) {
       console.error('Error cargando partido:', err);
       setError(err.message || 'Error al cargar el partido');
     } finally {
       setLoading(false);
     }
-  };
-
-  // Procesar eventos para marcar puntos
-  const procesarEventos = (eventos) => {
-    const nuevosSets = [...sets];
-
-    eventos.forEach((evento) => {
-      if (evento.tipo_evento === 'punto' && evento.marcador) {
-        const setIdx = (evento.numero_set || 1) - 1;
-        if (setIdx >= 0 && setIdx < 5) {
-          const equipoAnota = evento.punto?.resultado?.equipo_anota;
-          const marcador = evento.marcador;
-
-          if (equipoAnota === 'local') {
-            if (!nuevosSets[setIdx].puntosTachadosA.includes(marcador.local)) {
-              nuevosSets[setIdx].puntosTachadosA.push(marcador.local);
-            }
-            nuevosSets[setIdx].puntajeFinalA = Math.max(nuevosSets[setIdx].puntajeFinalA, marcador.local);
-          } else if (equipoAnota === 'visitante') {
-            if (!nuevosSets[setIdx].puntosTachadosB.includes(marcador.visitante)) {
-              nuevosSets[setIdx].puntosTachadosB.push(marcador.visitante);
-            }
-            nuevosSets[setIdx].puntajeFinalB = Math.max(nuevosSets[setIdx].puntajeFinalB, marcador.visitante);
-          }
-        }
-      }
-    });
-
-    setSets(nuevosSets);
-
-    // Actualizar resultados por set
-    const nuevosResultados = { ...resultados };
-    nuevosSets.forEach((set, idx) => {
-      nuevosResultados.sets[idx].gA = set.puntajeFinalA || '';
-      nuevosResultados.sets[idx].gB = set.puntajeFinalB || '';
-    });
-    setResultados(nuevosResultados);
   };
 
   // Toggle punto (manual)
@@ -473,52 +699,14 @@ export function PlanillaFIVB() {
   // Si no está mostrando planilla, mostrar selector
   if (!mostrarPlanilla) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Planilla FIVB - Cargar Partido</h1>
-
-        <div className="bg-white rounded-lg shadow p-6 max-w-md">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ID del Partido
-            </label>
-            <input
-              type="number"
-              value={idPartido}
-              onChange={(e) => setIdPartido(e.target.value)}
-              placeholder="Ej: 1, 2, 3..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={cargarPartido}
-            disabled={loading}
-            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                Cargando...
-              </>
-            ) : (
-              <>
-                <Search size={20} />
-                Cargar Partido
-              </>
-            )}
-          </button>
-
-          <div className="mt-4 text-sm text-gray-500">
-            <p>Ingresa el ID del partido para cargar los datos y generar la planilla FIVB.</p>
-          </div>
-        </div>
-      </div>
+      <SelectorPartido
+        idPartido={idPartido}
+        setIdPartido={setIdPartido}
+        onCargar={cargarPartido}
+        onCargarId={(id) => cargarPartido(id)}
+        loading={loading}
+        error={error}
+      />
     );
   }
 
@@ -530,17 +718,35 @@ export function PlanillaFIVB() {
         <button onClick={handleVolver} className="btn-toolbar">
           <ArrowLeft size={18} /> Volver
         </button>
-        <span className="toolbar-title">
-          Planilla FIVB - Partido #{datosPartido.codigo}
-        </span>
-        <button onClick={handleImprimir} className="btn-toolbar btn-primary">
-          <Printer size={18} /> Imprimir
-        </button>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+          <span className="toolbar-title" style={{ fontSize: '13px' }}>
+            {datosPartido.equipoA.nombre !== 'Equipo A' || datosPartido.equipoB.nombre !== 'Equipo B'
+              ? `${datosPartido.equipoA.nombre} vs ${datosPartido.equipoB.nombre}`
+              : `Planilla FIVB — Partido #${datosPartido.codigo}`}
+          </span>
+          {datosPartido.competicion && (
+            <span style={{ fontSize: '10px', color: '#9ca3af' }}>{datosPartido.competicion}</span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Controles de zoom */}
+          <button onClick={zoomOut} className="btn-toolbar" style={{ padding: '4px 10px', minWidth: '28px', fontSize: '16px', lineHeight: 1 }} title="Reducir">−</button>
+          <button onClick={zoomReset} style={{ fontSize: '11px', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', minWidth: '38px', textAlign: 'center' }} title="Restablecer zoom">{Math.round(zoom * 100)}%</button>
+          <button onClick={zoomIn}  className="btn-toolbar" style={{ padding: '4px 10px', minWidth: '28px', fontSize: '16px', lineHeight: 1 }} title="Ampliar">+</button>
+
+          <div style={{ width: '1px', height: '20px', background: '#374151', margin: '0 8px' }} />
+
+          <button onClick={handleImprimir} className="btn-toolbar btn-primary">
+            <Printer size={16} /> Imprimir
+          </button>
+        </div>
       </div>
 
       {/* Planilla FIVB */}
       <div className="planilla-container">
-        <div className="hoja">
+        <div className="hoja" style={{ zoom }}>
           {/* Header */}
           <div className="header">
             <div className="header-info col">
@@ -1030,10 +1236,11 @@ export function PlanillaFIVB() {
           top: 0;
           left: 0;
           right: 0;
-          z-index: 1000;
+          z-index: 1001;
           background: #1f2937;
           color: white;
-          padding: 10px 20px;
+          padding: 6px 20px;
+          height: 48px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1070,12 +1277,19 @@ export function PlanillaFIVB() {
         }
 
         .planilla-container {
-          margin-top: 60px;
-          padding: 20px;
-          background: #555;
-          min-height: calc(100vh - 60px);
+          position: fixed;
+          top: 48px;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 1000;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 16px;
+          background: #444;
           display: flex;
           justify-content: center;
+          align-items: flex-start;
         }
 
         .hoja {
@@ -1332,14 +1546,16 @@ export function PlanillaFIVB() {
           }
 
           .planilla-container {
-            margin-top: 0;
+            position: static;
+            top: auto;
             padding: 0;
             background: white;
+            overflow: visible;
           }
 
           .hoja {
-            width: 100%;
-            height: 100%;
+            width: 100% !important;
+            zoom: 1 !important;
             border: none;
             padding: 0;
           }
