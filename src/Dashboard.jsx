@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { handleLogout } from './utils/auth';
+import { puedeAccederModulo } from './utils/permissions';
 
 // Importar nuevos componentes del dashboard
 import VoleibolStatsGrid from './components/Voleibolstatsgrid';
@@ -28,6 +29,7 @@ import GestionInscripciones from './pages/GestionInscripciones';
 import { PlanillaFIVB } from './pages/PlanillaFIVB';
 import { TablaPosicionesPage } from './pages/TablaPosiciones';
 import { AsociacionPage } from './pages/Asociacion';
+import { EstadisticasPage } from './pages/EstadisticasPage';
 
 
 // ================================================
@@ -66,7 +68,7 @@ export default function Dashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(!isMobileWidth());
   const [isMobile, setIsMobile] = useState(isMobileWidth());
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState(() => sessionStorage.getItem('currentPage') || 'dashboard');
   const [userName, setUserName] = useState('');
   const [userRol, setUserRol] = useState('');
   const [usuario, setUsuario] = useState(null);
@@ -103,11 +105,15 @@ export default function Dashboard() {
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
+    sessionStorage.setItem('currentPage', page);
     if (isMobile) setSidebarOpen(false);
   };
 
-  // Renderizar la página actual
+  // Renderizar la página actual (valida permisos antes de renderizar)
   const renderPage = () => {
+    if (currentPage !== 'dashboard' && !puedeAccederModulo(currentPage)) {
+      return <DashboardPage />;
+    }
     switch (currentPage) {
       case 'dashboard':
         return <DashboardPage />;
@@ -149,6 +155,8 @@ export default function Dashboard() {
         return <TablaPosicionesPage />;
       case 'asociacion':
         return <AsociacionPage />;
+      case 'estadisticas':
+        return <EstadisticasPage />;
 
       default:
         return <DashboardPage />;

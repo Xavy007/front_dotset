@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Printer, Download, RefreshCw, Search, ArrowLeft, Loader2, ClipboardList } from 'lucide-react';
 import { planillaService } from '../services/planillaService';
 import { API_BASE } from '../services/api.config';
+import { useAsociacion } from '../hooks/useAsociacion';
 
 // ──────────────────────────────────────────────────────────
 // Selector de partido (pantalla inicial)
@@ -223,6 +224,7 @@ export function PlanillaFIVB() {
     partidoNum: '',
     division: 'M',
     categoria: 'Sen',
+    categoriaNombre: '',
     fecha: '',
     hora: '',
     equipoA: { nombre: '', abreviatura: 'A' },
@@ -271,7 +273,16 @@ export function PlanillaFIVB() {
   });
 
   const [observaciones, setObservaciones] = useState('');
+  const { asociacion } = useAsociacion();
   const [zoom, setZoom] = useState(1);
+  const [debugMongo, setDebugMongo] = useState(null); // null=no cargado, true=OK, string=error
+
+  // Sincronizar ciudad cuando asociacion carga después de que cargar() ya corrió
+  useEffect(() => {
+    if (asociacion?.ciudad && partidoCargado) {
+      setDatosPartido(prev => prev.ciudad ? prev : { ...prev, ciudad: asociacion.ciudad });
+    }
+  }, [asociacion, partidoCargado]);
 
   // Bloquear scroll del body cuando la planilla está activa + calcular zoom inicial
   useEffect(() => {
@@ -330,100 +341,173 @@ export function PlanillaFIVB() {
     try {
       if (idOverride) setIdPartido(idOverride);
 
-      const [partidoDigital, infoPostgres] = await Promise.all([
-        planillaService.getPartidoDigital(idFinal).catch(() => null),
-        planillaService.getInfoPartidoPostgres(idFinal).catch(() => null),
+      let infoPostgres = null;
+      let planillaCompleta = null;
+      let setsDirectos = null;
+      let errPg = null;
+      let errMongo = null;
+      let errSets = null;
+
+      let formacionesDirectas = null;
+      [infoPostgres, planillaCompleta, setsDirectos, formacionesDirectas] = await Promise.all([
+        planillaService.getInfoPartidoPostgres(idFinal).catch(e => { errPg = e.message; return null; }),
+        planillaService.getPlanillaCompleta(idFinal).catch(e => { errMongo = e.message; return null; }),
+        planillaService.getSetsPartido(idFinal).catch(e => { errSets = e.message; return null; }),
+        planillaService.getFormacionesPartido(idFinal).catch(() => null),
       ]);
 
-      const pg   = infoPostgres?.data  || {};
-      const mongo = partidoDigital?.data || {};
+      const pg    = infoPostgres?.data || {};
+      const mongo = planillaCompleta?.data || {};
+      const setsRaw = (mongo.sets?.length ? mongo.sets : null)
+                   || (setsDirectos?.data?.length ? setsDirectos.data : null)
+                   || [];
 
-      console.log('📋 Postgres (fixture):', pg);
-      console.log('📋 MongoDB (digital):', mongo);
+      console.log('📋 PG:', pg);
+      console.log('📋 Planilla completa:', mongo, '| error:', errMongo);
+      console.log('📋 Sets directos:', setsDirectos, '| error:', errSets);
+      console.log('📋 Sets usados:', setsRaw);
 
-      if (!infoPostgres?.data && !partidoDigital?.data) {
-        setError('No se encontraron datos para este partido. Verifique que el ID es correcto y que el partido existe.');
+      if (setsRaw.length > 0) {
+        setDebugMongo(`${setsRaw.length} set(s) cargados desde MongoDB`);
+      } else if (errMongo) {
+        setDebugMongo(`Sin datos MongoDB: ${errMongo}`);
+      } else {
+        setDebugMongo('Sin puntajes por set en MongoDB');
+      }
+
+      // Necesitamos al menos los datos de PostgreSQL para mostrar la planilla
+      if (!infoPostgres?.data) {
+        const detalle = errPg ? ` (${errPg})` : '';
+        setError(`No se encontraron datos del partido #${idFinal} en PostgreSQL${detalle}`);
         return;
       }
 
-      // Construir nombres localmente para evitar estado stale
+      // Nombres de equipo: PostgreSQL > MongoDB
       const nombreA = pg.equipo_local?.nombre     || mongo.equipos?.local?.nombre     || 'Equipo A';
       const nombreB = pg.equipo_visitante?.nombre  || mongo.equipos?.visitante?.nombre || 'Equipo B';
 
+      const catNombre = pg.categoria?.nombre || '';
+      const catRadio  = catNombre.toLowerCase().includes('jun') ? 'Jun' : 'Sen';
+
       setDatosPartido({
-        competicion: pg.campeonato?.nombre           || mongo.info_general?.campeonato || '',
-        ciudad:      pg.cancha?.ciudad               || '',
-        codigo:      pg.id_partido                   || idPartido,
-        lugar:       pg.cancha?.nombre               || '',
-        partidoNum:  pg.numero_partido               || idPartido,
-        division:    pg.categoria?.genero === 'F' ? 'F' : 'M',
-        categoria:   'Sen',
-        fecha:       pg.fecha_partido                || mongo.info_general?.hora_inicio_real || '',
-        hora:        pg.hora_partido                 || '',
+        competicion:     pg.campeonato?.nombre   || '',
+        ciudad:          asociacion?.ciudad       || '',
+        codigo:          pg.id_partido            || idFinal,
+        lugar:           pg.cancha?.nombre        || '',
+        partidoNum:      pg.id_partido            || idFinal,
+        division:        pg.categoria?.genero === 'F' ? 'F' : 'M',
+        categoria:       catRadio,
+        categoriaNombre: catNombre,
+        fecha:           pg.fecha_partido         || '',
+        hora:            pg.hora_partido          || '',
         equipoA: { nombre: nombreA, abreviatura: 'A' },
         equipoB: { nombre: nombreB, abreviatura: 'B' },
       });
 
-      // Árbitros desde PostgreSQL
-      if (pg.arbitros) {
-        setArbitros({
-          primero:   pg.arbitros.primero   || '',
-          segundo:   pg.arbitros.segundo   || '',
-          anotador:  pg.arbitros.anotador  || '',
-          capA: '',
-          capB: '',
-        });
-      }
+      // Árbitros: PostgreSQL (asignación formal) > MongoDB (árbitro que usó la app)
+      const arbPostgres = pg.arbitros || {};
+      const arbMongo    = mongo.arbitraje || {};
+      setArbitros({
+        primero:  arbPostgres.primero  || arbMongo.primer_arbitro?.nombre_completo  || '',
+        segundo:  arbPostgres.segundo  || arbMongo.segundo_arbitro?.nombre_completo || '',
+        anotador: arbPostgres.anotador || arbMongo.anotador?.nombre                 || '',
+        capA:     mongo.aprobaciones?.capitan_local?.nombre                         || '',
+        capB:     mongo.aprobaciones?.capitan_visitante?.nombre                     || '',
+      });
 
-      // Sets y marcador final
-      const setsLocal      = pg.sets_local      ?? mongo.resultado?.sets_local      ?? 0;
-      const setsVisitante  = pg.sets_visitante  ?? mongo.resultado?.sets_visitante  ?? 0;
-      const marcadorLocal  = pg.marcador_local  ?? 0;
-      const marcadorVisit  = pg.marcador_visitante ?? 0;
+      // Mapa dorsal→nombre para Local y Visitante (desde planteles de MongoDB)
+      const plantillaLocal     = mongo.equipos?.local?.plantilla     || [];
+      const plantillaVisitante = mongo.equipos?.visitante?.plantilla || [];
+      const mapDorsalLocal     = {};
+      const mapDorsalVisitante = {};
+      plantillaLocal.forEach(j     => { mapDorsalLocal[j.numero_dorsal]     = j.nombre_completo || ''; });
+      plantillaVisitante.forEach(j => { mapDorsalVisitante[j.numero_dorsal] = j.nombre_completo || ''; });
 
-      // Procesar eventos de puntos (sin closure stale: construir sets frescos)
+      // Sets ganados: contar directamente por puntaje en cada set (ignora campo ganador y PostgreSQL)
+      // Solo incluye sets con al menos 1 punto jugado para evitar sets vacíos del sistema
+      const setsConPuntos = setsRaw.filter(s => ((s.puntos_local ?? 0) + (s.puntos_visitante ?? 0)) > 0);
+      const setsLocal     = setsConPuntos.length > 0
+        ? setsConPuntos.filter(s => (s.puntos_local ?? 0) > (s.puntos_visitante ?? 0)).length
+        : (pg.sets_local ?? 0);
+      const setsVisitante = setsConPuntos.length > 0
+        ? setsConPuntos.filter(s => (s.puntos_visitante ?? 0) > (s.puntos_local ?? 0)).length
+        : (pg.sets_visitante ?? 0);
+      const marcadorLocal = pg.marcador_local ?? 0;
+      const marcadorVisit = pg.marcador_visitante ?? 0;
+
+      // Cuadrícula de puntos tachados: viene de los eventos detallados de MongoDB
       let setsActualizados = [
-        createEmptySet(1, 'A'),
-        createEmptySet(2, 'B'),
-        createEmptySet(3, 'A'),
-        createEmptySet(4, 'B'),
-        createEmptySet(5, 'A'),
+        createEmptySet(1, 'A'), createEmptySet(2, 'B'), createEmptySet(3, 'A'),
+        createEmptySet(4, 'B'), createEmptySet(5, 'A'),
       ];
 
-      try {
-        const eventos = await planillaService.getEventosPartido(idFinal);
-        if (eventos?.data && Array.isArray(eventos.data)) {
-          eventos.data.forEach((evento) => {
-            if (evento.tipo_evento === 'punto' && evento.marcador) {
-              const setIdx = (evento.numero_set || 1) - 1;
-              if (setIdx >= 0 && setIdx < 5) {
-                const equipo  = evento.punto?.resultado?.equipo_anota;
-                const marcador = evento.marcador;
-                if (equipo === 'local') {
-                  if (!setsActualizados[setIdx].puntosTachadosA.includes(marcador.local))
-                    setsActualizados[setIdx].puntosTachadosA.push(marcador.local);
-                  setsActualizados[setIdx].puntajeFinalA = Math.max(setsActualizados[setIdx].puntajeFinalA, marcador.local);
-                } else if (equipo === 'visitante') {
-                  if (!setsActualizados[setIdx].puntosTachadosB.includes(marcador.visitante))
-                    setsActualizados[setIdx].puntosTachadosB.push(marcador.visitante);
-                  setsActualizados[setIdx].puntajeFinalB = Math.max(setsActualizados[setIdx].puntajeFinalB, marcador.visitante);
-                }
+      // Puntajes finales por set: planilla completa > sets directos
+      const puntajesPorSet = {};
+      setsRaw.forEach(s => {
+        const idx = (s.numero_set || 1) - 1;
+        if (idx >= 0 && idx < 5) {
+          const pl = s.puntos_local   ?? 0;
+          const pv = s.puntos_visitante ?? 0;
+          // Ignorar sets sin puntos (sets vacíos creados por el app al finalizar)
+          if (pl === 0 && pv === 0) return;
+          puntajesPorSet[idx] = { local: pl, visitante: pv };
+          setsActualizados[idx].puntajeFinalA = pl;
+          setsActualizados[idx].puntajeFinalB = pv;
+
+          // Puntos tachados desde eventos embebidos (solo en planilla completa)
+          if (s.eventos && Array.isArray(s.eventos)) {
+            s.eventos.forEach(ev => {
+              if (ev.tipo_evento === 'punto' && ev.marcador) {
+                const eq = ev.punto?.resultado?.equipo_anota;
+                if (eq === 'local' && !setsActualizados[idx].puntosTachadosA.includes(ev.marcador.local))
+                  setsActualizados[idx].puntosTachadosA.push(ev.marcador.local);
+                if (eq === 'visitante' && !setsActualizados[idx].puntosTachadosB.includes(ev.marcador.visitante))
+                  setsActualizados[idx].puntosTachadosB.push(ev.marcador.visitante);
               }
+            });
+          }
+
+          // Formación inicial del set → rotaciones
+          // Prioridad: embebida en planilla completa > endpoint directo de formaciones
+          const fiDirecta = (formacionesDirectas?.data || []).find(f => f.numero_set === (idx + 1));
+          const fi = s.formacion_inicial || fiDirecta;
+          if (fi) {
+            const POSICIONES = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+            if (fi.formacion_local) {
+              setsActualizados[idx].rotacionesA = POSICIONES.map(pos => {
+                const dorsal = fi.formacion_local[`posicion_${pos}`];
+                return {
+                  posicion: pos,
+                  numero:   dorsal != null ? String(dorsal) : '',
+                  jugador:  dorsal != null ? (mapDorsalLocal[dorsal] || '') : '',
+                  libero:   '',
+                  saques:   Array(8).fill(false),
+                };
+              });
             }
-          });
+            if (fi.formacion_visitante) {
+              setsActualizados[idx].rotacionesB = POSICIONES.map(pos => {
+                const dorsal = fi.formacion_visitante[`posicion_${pos}`];
+                return {
+                  posicion: pos,
+                  numero:   dorsal != null ? String(dorsal) : '',
+                  jugador:  dorsal != null ? (mapDorsalVisitante[dorsal] || '') : '',
+                  libero:   '',
+                  saques:   Array(8).fill(false),
+                };
+              });
+            }
+          }
         }
-      } catch (e) {
-        console.log('No se pudieron cargar eventos:', e);
-      }
+      });
 
       setSets(setsActualizados);
 
-      // Actualizar resultados incluyendo marcadores por set
       setResultados((prev) => {
         const nuevosSets = prev.sets.map((s, idx) => ({
           ...s,
-          gA: setsActualizados[idx].puntajeFinalA || '',
-          gB: setsActualizados[idx].puntajeFinalB || '',
+          gA: puntajesPorSet[idx] !== undefined ? puntajesPorSet[idx].local     : '',
+          gB: puntajesPorSet[idx] !== undefined ? puntajesPorSet[idx].visitante  : '',
         }));
         return {
           ...prev,
@@ -490,7 +574,23 @@ export function PlanillaFIVB() {
     const teamBLabel = esSetImpar ? 'B' : 'A';
 
     return (
-      <div className="set-box">
+      <div style={{ marginBottom: '5px' }}>
+        {/* Denominación SET N */}
+        <div style={{
+          background: '#1e3a5f',
+          color: 'white',
+          textAlign: 'center',
+          fontWeight: 'bold',
+          fontSize: '9px',
+          padding: '2px 0',
+          letterSpacing: '1px',
+          border: '2px solid #000',
+          borderBottom: 'none',
+        }}>
+          SET {setIdx + 1}
+        </div>
+
+      <div className="set-box" style={{ marginBottom: 0 }}>
         {/* Lateral izquierdo */}
         <div className="set-lat">
           <div>
@@ -690,8 +790,8 @@ export function PlanillaFIVB() {
               style={{ width: '25px', borderBottom: '1px solid black' }}
             />
           </div>
-          <div style={{ transform: 'rotate(180deg)' }}>SET {setIdx + 1}</div>
         </div>
+      </div>
       </div>
     );
   };
@@ -727,6 +827,17 @@ export function PlanillaFIVB() {
           </span>
           {datosPartido.competicion && (
             <span style={{ fontSize: '10px', color: '#9ca3af' }}>{datosPartido.competicion}</span>
+          )}
+          {debugMongo && (
+            <span style={{
+              fontSize: '9px',
+              padding: '1px 6px',
+              borderRadius: '8px',
+              background: debugMongo.startsWith('Sin') ? '#7c2d12' : '#14532d',
+              color: '#fef2f2',
+            }}>
+              {debugMongo}
+            </span>
           )}
         </div>
 
@@ -809,33 +920,53 @@ export function PlanillaFIVB() {
                 />
                 F | Cat:{' '}
                 <input
-                  type="radio"
-                  checked={datosPartido.categoria === 'Sen'}
-                  onChange={() => setDatosPartido({ ...datosPartido, categoria: 'Sen' })}
+                  className="linea"
+                  style={{ width: '55px' }}
+                  value={datosPartido.categoriaNombre || datosPartido.categoria}
+                  onChange={(e) => setDatosPartido({ ...datosPartido, categoriaNombre: e.target.value })}
                 />
-                Sen{' '}
-                <input
-                  type="radio"
-                  checked={datosPartido.categoria === 'Jun'}
-                  onChange={() => setDatosPartido({ ...datosPartido, categoria: 'Jun' })}
-                />
-                Jun
               </div>
             </div>
             <div className="header-logo">FIVB</div>
             <div className="header-info col center">
-              <b>FEDERATION INTERNATIONALE DE VOLLEYBALL</b>
+              <b style={{ fontSize: '9px' }}>FEDERATION INTERNATIONALE DE VOLLEYBALL</b>
+              {asociacion?.nombre && (
+                <div style={{ fontSize: '8px', color: '#444', marginTop: '1px' }}>
+                  {asociacion.nombre}{asociacion.ciudad ? ` — ${asociacion.ciudad}` : ''}
+                </div>
+              )}
               <div
                 style={{
                   borderTop: '2px solid black',
                   width: '100%',
                   textAlign: 'center',
-                  marginTop: '5px',
+                  marginTop: '4px',
                   paddingTop: '2px',
                   fontWeight: 'bold',
+                  fontSize: '10px',
                 }}
               >
                 PLANILLA DE ANOTACION
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '4px', fontSize: '9px' }}>
+                <span>
+                  Fecha:{' '}
+                  <input
+                    className="linea"
+                    style={{ width: '65px' }}
+                    value={datosPartido.fecha}
+                    onChange={(e) => setDatosPartido({ ...datosPartido, fecha: e.target.value })}
+                  />
+                </span>
+                <span>
+                  Hora:{' '}
+                  <input
+                    className="linea"
+                    style={{ width: '35px' }}
+                    value={datosPartido.hora}
+                    onChange={(e) => setDatosPartido({ ...datosPartido, hora: e.target.value })}
+                  />
+                </span>
               </div>
             </div>
           </div>
@@ -1050,9 +1181,10 @@ export function PlanillaFIVB() {
                               }}
                             />
                           </td>
-                          <td>
+                          <td style={{ background: set.gA === '' ? '#fffbcc' : 'transparent' }}>
                             <input
                               value={set.gA}
+                              placeholder="—"
                               onChange={(e) => {
                                 const nuevos = { ...resultados };
                                 nuevos.sets[idx].gA = e.target.value;
@@ -1061,7 +1193,7 @@ export function PlanillaFIVB() {
                             />
                           </td>
                           <td>{idx + 1}</td>
-                          <td>
+                          <td style={{ background: set.gB === '' ? '#fffbcc' : 'transparent' }}>
                             <input
                               value={set.gB}
                               onChange={(e) => {

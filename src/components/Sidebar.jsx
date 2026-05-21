@@ -57,6 +57,7 @@ export function Sidebar({ isOpen, isMobile, currentPage, onPageChange, onToggle,
       { label: 'Prog. Partidos', icon: CalendarCog,   page: 'gestion-partidos',     module: 'partidos'    },
       { label: 'Partidos',       icon: Activity,      page: 'partidos',             module: 'partidos'    },
       { label: 'Posiciones',     icon: Medal,         page: 'tabla-posiciones',     module: 'campeonatos' },
+      { label: 'Estadísticas',  icon: BarChart3,     page: 'estadisticas',         module: 'estadisticas' },
 
       // — Administración —
       { label: 'Usuarios',       icon: User,          page: 'usuarios',             module: 'usuarios'    },

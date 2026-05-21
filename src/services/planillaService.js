@@ -103,6 +103,19 @@ export const planillaService = {
   },
 
   /**
+   * Obtener todas las formaciones de un partido
+   * @param {number} idPartido - ID del partido
+   */
+  getFormacionesPartido: async (idPartido) => {
+    const response = await fetch(`${API_BASE}/mongodb/formaciones/${idPartido}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Error obteniendo formaciones');
+    return data;
+  },
+
+  /**
    * Obtener detalle de sets de un partido (desde MongoDB)
    * @param {number} idPartido - ID del partido
    */

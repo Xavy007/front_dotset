@@ -18,9 +18,10 @@ export const PERMISSIONS = {
     canchas: ['crear', 'leer', 'actualizar', 'eliminar'],
     partidos: ['crear', 'leer', 'actualizar', 'eliminar'],
     reportes: ['leer'],
+    estadisticas: ['leer'],
     configuracion: ['leer', 'actualizar'],
   },
-  
+
   secretario: {
     dashboard: ['leer'],
     gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
@@ -34,8 +35,9 @@ export const PERMISSIONS = {
     canchas: ['leer'],
     partidos: ['crear', 'leer', 'actualizar'],
     reportes: ['leer'],
+    estadisticas: ['leer'],
   },
-  
+
   presidente: {
     gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
     dashboard: ['leer'],
@@ -49,9 +51,10 @@ export const PERMISSIONS = {
     canchas: ['leer'],
     partidos: ['leer'],
     reportes: ['leer'],
+    estadisticas: ['leer'],
     configuracion: ['leer'],
   },
-  
+
   presidenteclub: {
     dashboard: ['leer'],
     jugadores: ['crear', 'leer', 'actualizar'], // Solo de su club
@@ -61,21 +64,24 @@ export const PERMISSIONS = {
     campeonatos: ['leer'],
     partidos: ['leer'],
     reportes: ['leer'],
+    estadisticas: ['leer'],
   },
-  
+
   representante: {
     dashboard: ['leer'],
     jugadores: ['leer'], // Solo de su club
     equipos: ['leer'], // Solo sus equipos
     campeonatos: ['leer'],
     partidos: ['leer'],
+    estadisticas: ['leer'],
   },
-  
+
   juez: {
     dashboard: ['leer'],
     partidos: ['leer', 'actualizar'], // Solo registrar resultados
     campeonatos: ['leer'],
     canchas: ['leer'],
+    estadisticas: ['leer'],
   }
 };
 
