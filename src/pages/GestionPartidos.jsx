@@ -93,16 +93,11 @@ export default function GestionPartidos() {
   };
 
   const handleGuardarAsignacion = async (datos) => {
-    try {
-      const response = await fixtureService.actualizarPartido(partidoSeleccionado.id_partido, datos);
-
-      if (response.success) {
-        setShowModalAsignar(false);
-        cargarFixture(); // Recargar para mostrar cambios
-        toast.success('Partido actualizado exitosamente');
-      }
-    } catch (error) {
-      toast.error('Error al actualizar partido: ' + error.message);
+    const response = await fixtureService.actualizarPartido(partidoSeleccionado.id_partido, datos);
+    if (response.success) {
+      setShowModalAsignar(false);
+      cargarFixture();
+      toast.success('Partido actualizado exitosamente');
     }
   };
 

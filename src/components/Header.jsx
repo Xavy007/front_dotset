@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LogOut, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronDown, Menu } from 'lucide-react';
 import { LogoutModal } from '../utils/LogoutModal';
 
-export function Header({ usuario, onLogout }) {
+export function Header({ usuario, onLogout, onToggleSidebar }) {
   const [open, setOpen] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const ref = useRef(null);
@@ -22,7 +22,14 @@ export function Header({ usuario, onLogout }) {
 
   return (
     <>
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-4 lg:px-6 shrink-0">
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 shrink-0">
+        {/* Botón hamburguesa — solo visible en mobile */}
+        <button
+          onClick={onToggleSidebar}
+          className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+        >
+          <Menu size={22} />
+        </button>
 
         {/* Menú de usuario */}
         <div className="relative" ref={ref}>

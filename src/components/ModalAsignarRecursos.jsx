@@ -14,6 +14,8 @@ export default function ModalAsignarRecursos({ partido, onClose, onGuardar }) {
   const [observaciones, setObservaciones] = useState(partido.observaciones || '');
   const [juecesSeleccionados, setJuecesSeleccionados] = useState([]);
   const [planilleroSeleccionado, setPlanilleroSeleccionado] = useState('');
+  const [conflictoError, setConflictoError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     cargarRecursos();
@@ -64,16 +66,23 @@ export default function ModalAsignarRecursos({ partido, onClose, onGuardar }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    onGuardar({
-      id_cancha: idCancha ? parseInt(idCancha) : null,
-      fecha_hora: fechaHora ? new Date(fechaHora).toISOString() : null,
-      observaciones,
-      jueces: juecesSeleccionados,
-      id_planillero: planilleroSeleccionado ? parseInt(planilleroSeleccionado) : null
-    });
+    setConflictoError(null);
+    setSaving(true);
+    try {
+      await onGuardar({
+        id_cancha: idCancha ? parseInt(idCancha) : null,
+        fecha_hora: fechaHora ? new Date(fechaHora).toISOString() : null,
+        observaciones,
+        jueces: juecesSeleccionados,
+        id_planillero: planilleroSeleccionado ? parseInt(planilleroSeleccionado) : null
+      });
+    } catch (error) {
+      setConflictoError(error.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleJuez = (idJuez) => {
@@ -131,7 +140,7 @@ export default function ModalAsignarRecursos({ partido, onClose, onGuardar }) {
                 </label>
                 <select
                   value={idCancha}
-                  onChange={(e) => setIdCancha(e.target.value)}
+                  onChange={(e) => { setIdCancha(e.target.value); setConflictoError(null); }}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                 >
                   <option value="">Sin asignar</option>
@@ -151,11 +160,29 @@ export default function ModalAsignarRecursos({ partido, onClose, onGuardar }) {
                 <input
                   type="datetime-local"
                   value={fechaHora}
-                  onChange={(e) => setFechaHora(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  onChange={(e) => { setFechaHora(e.target.value); setConflictoError(null); }}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 transition-all ${
+                    conflictoError
+                      ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                      : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+                  }`}
                   required
                 />
               </div>
+
+              {/* Alerta de conflicto de horario */}
+              {conflictoError && (
+                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-300 rounded-xl">
+                  <span className="text-red-500 text-xl flex-shrink-0 mt-0.5">⚠️</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-red-700 text-sm">Conflicto de horario en la cancha</p>
+                    <p className="text-sm text-red-600 mt-1">{conflictoError}</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Cambia la hora de inicio o selecciona otra cancha para continuar.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Árbitros */}
               <div>
@@ -293,10 +320,15 @@ export default function ModalAsignarRecursos({ partido, onClose, onGuardar }) {
             <button
               type="submit"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || saving}
               className="flex-1 sm:flex-none px-6 sm:px-5 py-3 sm:py-2 text-base sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl sm:rounded-lg hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 sm:active:from-blue-700 sm:active:to-blue-800 transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md sm:shadow-sm disabled:shadow-none"
             >
-              💾 Guardar
+              {saving ? (
+                <>
+                  <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                  Guardando...
+                </>
+              ) : '💾 Guardar'}
             </button>
           </div>
         </div>

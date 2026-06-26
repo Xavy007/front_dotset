@@ -6,7 +6,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   MapPin, Plus, Search, AlertCircle,
-  Pencil, Power, Trash2, Home, Users, Building2
+  Pencil, Power, Trash2, Home, Users, Building2,
+  CalendarDays, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
@@ -21,6 +22,12 @@ export function CanchasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // --- Disponibilidad ---
+  const [dispCancha, setDispCancha] = useState(null);
+  const [dispFecha, setDispFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dispPartidos, setDispPartidos] = useState([]);
+  const [dispLoading, setDispLoading] = useState(false);
 
   const _rol = getUsuarioActual()?.rol || '';
   const puedeEditarCancha   = tienePermiso(_rol, 'canchas', 'actualizar');
@@ -170,6 +177,53 @@ export function CanchasPage() {
   };
 
   // ===============================================
+  // DISPONIBILIDAD
+  // ===============================================
+  const fetchDisponibilidad = async (id_cancha, fecha) => {
+    setDispLoading(true);
+    setDispPartidos([]);
+    try {
+      const res = await fetch(`${API_URL}/${id_cancha}/partidos?fecha=${fecha}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Error al consultar disponibilidad');
+      const data = await res.json();
+      setDispPartidos(data.data || []);
+    } catch (err) {
+      console.error(err);
+      setDispPartidos([]);
+    } finally {
+      setDispLoading(false);
+    }
+  };
+
+  const abrirDisponibilidad = (cancha) => {
+    setDispCancha(cancha);
+    setDispFecha(new Date().toISOString().slice(0, 10));
+    fetchDisponibilidad(cancha.id_cancha, new Date().toISOString().slice(0, 10));
+  };
+
+  const cambiarFechaDisp = (nuevaFecha) => {
+    setDispFecha(nuevaFecha);
+    if (dispCancha) fetchDisponibilidad(dispCancha.id_cancha, nuevaFecha);
+  };
+
+  const moverDia = (dias) => {
+    const d = new Date(dispFecha + 'T12:00:00');
+    d.setDate(d.getDate() + dias);
+    const nueva = d.toISOString().slice(0, 10);
+    cambiarFechaDisp(nueva);
+  };
+
+  const P_ESTADO_LABEL = {
+    programado:  { label: 'Programado',  cls: 'bg-blue-100 text-blue-700' },
+    en_curso:    { label: 'En curso',    cls: 'bg-green-100 text-green-700' },
+    finalizado:  { label: 'Finalizado',  cls: 'bg-gray-100 text-gray-600' },
+    suspendido:  { label: 'Suspendido',  cls: 'bg-yellow-100 text-yellow-700' },
+    cancelado:   { label: 'Cancelado',   cls: 'bg-red-100 text-red-600' },
+  };
+
+  // ===============================================
   // FILTRO DE BÚSQUEDA
   // ===============================================
   const filteredCanchas = canchas.filter((c) => {
@@ -250,6 +304,13 @@ export function CanchasPage() {
       label: 'Acciones',
       render: (_v, row) => (
         <div className="flex items-center gap-2">
+          <button
+            title="Ver disponibilidad"
+            onClick={() => abrirDisponibilidad(row)}
+            className="p-2 border border-gray-300 rounded-lg hover:bg-indigo-50 hover:border-indigo-400 transition-all"
+          >
+            <CalendarDays size={18} className="text-indigo-600" />
+          </button>
           {puedeEditarCancha && (
             <button
               title="Editar"
@@ -430,6 +491,106 @@ export function CanchasPage() {
         initialData={editingCancha || {}}
         size="4xl"
       />
+      {/* ── MODAL DISPONIBILIDAD ── */}
+      {dispCancha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+
+            {/* Cabecera */}
+            <div className="flex items-center gap-3 p-5 border-b bg-gradient-to-r from-indigo-600 to-blue-600 rounded-t-2xl">
+              <CalendarDays size={22} className="text-white flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-white truncate">{dispCancha.nombre}</h2>
+                <p className="text-indigo-100 text-xs">Disponibilidad por día</p>
+              </div>
+              <button onClick={() => setDispCancha(null)} className="text-white/70 hover:text-white transition">
+                <XCircle size={22} />
+              </button>
+            </div>
+
+            {/* Selector de fecha */}
+            <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
+              <button
+                onClick={() => moverDia(-1)}
+                className="p-1.5 rounded-lg hover:bg-gray-200 transition"
+              >
+                <ChevronLeft size={18} className="text-gray-600" />
+              </button>
+              <input
+                type="date"
+                value={dispFecha}
+                onChange={(e) => cambiarFechaDisp(e.target.value)}
+                className="flex-1 text-center border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              <button
+                onClick={() => moverDia(1)}
+                className="p-1.5 rounded-lg hover:bg-gray-200 transition"
+              >
+                <ChevronRight size={18} className="text-gray-600" />
+              </button>
+              <button
+                onClick={() => cambiarFechaDisp(new Date().toISOString().slice(0, 10))}
+                className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition font-medium"
+              >
+                Hoy
+              </button>
+            </div>
+
+            {/* Estado general del día */}
+            {!dispLoading && (
+              <div className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold ${dispPartidos.length === 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                {dispPartidos.length === 0
+                  ? <><CheckCircle2 size={18} /> Cancha disponible — sin partidos programados</>
+                  : <><Clock size={18} /> {dispPartidos.length} partido{dispPartidos.length !== 1 ? 's' : ''} programado{dispPartidos.length !== 1 ? 's' : ''} este día</>
+                }
+              </div>
+            )}
+
+            {/* Lista de partidos */}
+            <div className="flex-1 overflow-y-auto p-5 max-h-96">
+              {dispLoading ? (
+                <div className="flex items-center justify-center py-10 text-gray-400">
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-indigo-600 mr-3" />
+                  Consultando...
+                </div>
+              ) : dispPartidos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                  <CalendarDays size={36} className="mb-2 opacity-40" />
+                  <p className="text-sm">No hay partidos para esta fecha.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {dispPartidos.map((p) => {
+                    const hora = p.fecha_hora
+                      ? new Date(p.fecha_hora).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })
+                      : '—';
+                    const local     = p.equipoLocal?.nombre     ?? p.equipo_local_nombre     ?? '—';
+                    const visitante = p.equipoVisitante?.nombre ?? p.equipo_visitante_nombre ?? '—';
+                    const estado    = P_ESTADO_LABEL[p.p_estado] ?? { label: p.p_estado, cls: 'bg-gray-100 text-gray-600' };
+
+                    return (
+                      <div key={p.id_partido} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex flex-col items-center justify-center w-14 flex-shrink-0">
+                          <Clock size={14} className="text-indigo-400 mb-0.5" />
+                          <span className="text-sm font-bold text-indigo-700">{hora}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {local} <span className="text-gray-400 font-normal">vs</span> {visitante}
+                          </p>
+                        </div>
+                        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${estado.cls}`}>
+                          {estado.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

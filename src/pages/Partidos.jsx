@@ -4,9 +4,21 @@ import { fixtureService } from '../services/fixtureService';
 import { campeonatoService } from '../services/campeonatoService';
 import ModalAsignarRecursos from '../components/ModalAsignarRecursos';
 import { toast } from 'sonner';
-import { SERVER_URL } from '../services/api.config';
+import { SERVER_URL, API_BASE } from '../services/api.config';
+import { getUsuarioActual } from '../utils/permissions';
+
+const ROL_BADGE = {
+  'Árbitro 1':    { bg: 'bg-blue-700',   text: 'text-white' },
+  'Árbitro 2':    { bg: 'bg-blue-500',   text: 'text-white' },
+  'Anotador':     { bg: 'bg-purple-600', text: 'text-white' },
+  'Cronometrista':{ bg: 'bg-amber-500',  text: 'text-white' },
+  'Planillero':   { bg: 'bg-green-600',  text: 'text-white' },
+};
 
 export const PartidosPage = () => {
+  const usuarioActual = getUsuarioActual();
+  const esJuez = usuarioActual?.rol === 'juez';
+
   // Estado para filtros
   const [campeonatos, setCampeonatos] = useState([]);
   const [selectedCampeonato, setSelectedCampeonato] = useState('');
@@ -23,9 +35,17 @@ export const PartidosPage = () => {
   const [editingPartido, setEditingPartido] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
+  // Estado Mis Partidos (juez)
+  const [misPartidos, setMisPartidos] = useState([]);
+  const [loadingMis, setLoadingMis] = useState(false);
+
   // Cargar campeonatos al montar componente
   useEffect(() => {
-    cargarCampeonatos();
+    if (esJuez) {
+      cargarMisPartidos();
+    } else {
+      cargarCampeonatos();
+    }
   }, []);
 
   // Cargar partidos cuando cambia el campeonato o fecha
@@ -34,6 +54,24 @@ export const PartidosPage = () => {
       cargarPartidos();
     }
   }, [selectedCampeonato, selectedDate]);
+
+  const cargarMisPartidos = async () => {
+    setLoadingMis(true);
+    try {
+      const token = sessionStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/partidos/mis-partidos`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) setMisPartidos(data.data || []);
+      else toast.error('Error al cargar tus partidos');
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudo conectar con el servidor');
+    } finally {
+      setLoadingMis(false);
+    }
+  };
 
   const cargarCampeonatos = async () => {
     try {
@@ -198,6 +236,162 @@ export const PartidosPage = () => {
     pendientes: partidos.filter(p => !p.id_cancha || !p.fecha_hora).length,
     conJueces: partidos.filter(p => p.asignacionJueces).length,
   };
+
+  /* ── Vista exclusiva para el rol juez ── */
+  if (esJuez) {
+    const misPartidosPorFecha = misPartidos.reduce((acc, p) => {
+      const key = p.fecha_hora
+        ? new Date(p.fecha_hora).toISOString().split('T')[0]
+        : 'Sin fecha';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(p);
+      return acc;
+    }, {});
+    const fechas = Object.keys(misPartidosPorFecha).sort((a, b) =>
+      a === 'Sin fecha' ? 1 : b === 'Sin fecha' ? -1 : new Date(a) - new Date(b)
+    );
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="w-full">
+          {/* Header juez */}
+          <div className="mb-6 px-6 pt-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-1">⚖️ Mis Partidos Asignados</h1>
+              <p className="text-gray-600">Solo los partidos donde tienes un rol asignado</p>
+            </div>
+            <button
+              onClick={cargarMisPartidos}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-all text-sm"
+            >
+              🔄 Actualizar
+            </button>
+          </div>
+
+          {loadingMis && (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600"></div>
+              <span className="ml-4 text-gray-600 font-semibold">Cargando partidos...</span>
+            </div>
+          )}
+
+          {!loadingMis && misPartidos.length === 0 && (
+            <div className="bg-white rounded-2xl shadow-sm p-12 text-center mx-6 border border-gray-200">
+              <p className="text-5xl mb-4">⚖️</p>
+              <p className="text-gray-700 font-semibold text-lg">No tienes partidos asignados</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Cuando se te asigne un partido como árbitro, anotador o planillero aparecerá aquí.
+              </p>
+            </div>
+          )}
+
+          {!loadingMis && fechas.length > 0 && (
+            <div className="space-y-4 mx-6 pb-6">
+              {/* Contador */}
+              <div className="flex gap-4">
+                <div className="bg-indigo-600 text-white rounded-xl px-5 py-3 font-bold text-lg shadow">
+                  {misPartidos.length} partido{misPartidos.length !== 1 ? 's' : ''} asignado{misPartidos.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {fechas.map(fecha => (
+                <div key={fecha} className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+                  {/* Cabecera de fecha */}
+                  <div className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-bold text-white text-lg">
+                      {fecha === 'Sin fecha' ? '?' : new Date(fecha + 'T00:00:00').getDate()}
+                    </div>
+                    <div>
+                      <p className="text-white font-bold">{formatFecha(fecha === 'Sin fecha' ? null : fecha)}</p>
+                      <p className="text-indigo-200 text-xs">{misPartidosPorFecha[fecha].length} partido(s)</p>
+                    </div>
+                  </div>
+
+                  {/* Cards */}
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {misPartidosPorFecha[fecha].map(p => {
+                      const rolBadge = ROL_BADGE[p.mi_rol] || { bg: 'bg-gray-400', text: 'text-white' };
+                      const estadoColor = {
+                        programado: 'bg-blue-100 text-blue-700',
+                        en_juego:   'bg-green-100 text-green-700',
+                        finalizado: 'bg-gray-100 text-gray-600',
+                        suspendido: 'bg-yellow-100 text-yellow-700',
+                        wo:         'bg-red-100 text-red-700',
+                      }[p.p_estado] || 'bg-gray-100 text-gray-600';
+
+                      return (
+                        <div key={p.id_partido} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all">
+                          {/* Mi rol */}
+                          <div className={`px-4 py-2 ${rolBadge.bg} flex items-center justify-between`}>
+                            <span className={`font-bold text-sm ${rolBadge.text}`}>
+                              ⚖️ {p.mi_rol || 'Juez'}
+                            </span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${estadoColor}`}>
+                              {p.p_estado}
+                            </span>
+                          </div>
+
+                          <div className="p-4">
+                            {/* Hora */}
+                            <div className="text-center mb-3">
+                              <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                {formatHora(p.fecha_hora)}
+                              </span>
+                            </div>
+
+                            {/* Equipos */}
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <div className="flex-1 text-center">
+                                {p.equipoLocal?.club?.logo ? (
+                                  <img
+                                    src={p.equipoLocal.club.logo.startsWith('http') ? p.equipoLocal.club.logo
+                                      : `${SERVER_URL}${p.equipoLocal.club.logo.startsWith('/') ? '' : '/'}${p.equipoLocal.club.logo}`}
+                                    className="w-10 h-10 object-contain mx-auto mb-1"
+                                    onError={e => { e.target.style.display = 'none'; }}
+                                    alt=""
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-gray-200 rounded-full mx-auto mb-1 flex items-center justify-center text-xs">🏐</div>
+                                )}
+                                <p className="text-xs font-bold text-gray-900 truncate">{p.equipoLocal?.nombre || 'Local'}</p>
+                              </div>
+                              <span className="text-gray-400 font-bold text-sm">VS</span>
+                              <div className="flex-1 text-center">
+                                {p.equipoVisitante?.club?.logo ? (
+                                  <img
+                                    src={p.equipoVisitante.club.logo.startsWith('http') ? p.equipoVisitante.club.logo
+                                      : `${SERVER_URL}${p.equipoVisitante.club.logo.startsWith('/') ? '' : '/'}${p.equipoVisitante.club.logo}`}
+                                    className="w-10 h-10 object-contain mx-auto mb-1"
+                                    onError={e => { e.target.style.display = 'none'; }}
+                                    alt=""
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-gray-200 rounded-full mx-auto mb-1 flex items-center justify-center text-xs">🏐</div>
+                                )}
+                                <p className="text-xs font-bold text-gray-900 truncate">{p.equipoVisitante?.nombre || 'Visitante'}</p>
+                              </div>
+                            </div>
+
+                            {/* Cancha */}
+                            {p.cancha && (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                                <MapPin size={12} className="text-green-600 flex-shrink-0" />
+                                <span className="truncate">{p.cancha.nombre}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

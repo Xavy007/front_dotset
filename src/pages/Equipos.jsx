@@ -46,6 +46,13 @@ export function EquiposPage() {
   const [campeonatosFiltro, setCampeonatosFiltro] = useState([]);
   const [campeonatoSeleccionadoFiltro, setCampeonatoSeleccionadoFiltro] = useState(null);
 
+  // Vista por campeonato
+  const [vistaMode, setVistaMode] = useState('lista');
+  const [campeonatoVistaId, setCampeonatoVistaId] = useState('');
+  const [campeonatosVista, setCampeonatosVista] = useState([]);
+  const [equiposCampeonato, setEquiposCampeonato] = useState([]);
+  const [loadingVistaCamp, setLoadingVistaCamp] = useState(false);
+
   // Estados para modal del carnet
   const [isCarnetModalOpen, setIsCarnetModalOpen] = useState(false);
   const [carnetSeleccionado, setCarnetSeleccionado] = useState(null);
@@ -157,6 +164,44 @@ export function EquiposPage() {
     } catch (err) {
       console.error('Error cargando campeonatos:', err);
     }
+  };
+
+  const fetchCampeonatosVista = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/campeonato`, { headers: getAuthHeaders() });
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : data.data || [];
+      setCampeonatosVista(arr);
+    } catch (err) {
+      console.error('Error cargando campeonatos para vista:', err);
+    }
+  };
+
+  const fetchEquiposPorCampeonato = async (id_campeonato) => {
+    if (!id_campeonato) { setEquiposCampeonato([]); return; }
+    setLoadingVistaCamp(true);
+    try {
+      const res = await fetch(`${API_URL}/campeonato/${id_campeonato}`, { headers: getAuthHeaders() });
+      const data = await res.json();
+      setEquiposCampeonato(Array.isArray(data.data) ? data.data : []);
+    } catch (err) {
+      console.error('Error cargando equipos por campeonato:', err);
+      setEquiposCampeonato([]);
+    } finally {
+      setLoadingVistaCamp(false);
+    }
+  };
+
+  const handleCambiarVista = (modo) => {
+    setVistaMode(modo);
+    if (modo === 'campeonato' && campeonatosVista.length === 0) {
+      fetchCampeonatosVista();
+    }
+  };
+
+  const handleCampeonatoVistaChange = (id) => {
+    setCampeonatoVistaId(id);
+    fetchEquiposPorCampeonato(id);
   };
 
   // ===============================================
@@ -613,26 +658,145 @@ export function EquiposPage() {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar equipo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+      {/* Toggle de vista */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => handleCambiarVista('lista')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            vistaMode === 'lista'
+              ? 'bg-blue-600 text-white shadow'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Lista de Equipos
+        </button>
+        <button
+          onClick={() => handleCambiarVista('campeonato')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            vistaMode === 'campeonato'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Por Campeonato
+        </button>
       </div>
 
-      <StatsRow cols={3}>
-        <StatCard title="Total Equipos" value={equipos.length} icon={Shield} color="blue" loading={loading} />
-        <StatCard title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
-        <StatCard title="Inactivos" value={totalInactivos} icon={XCircle} color="red" loading={loading} />
-      </StatsRow>
+      {vistaMode === 'lista' && (
+        <>
+          <div className="flex gap-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar equipo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
 
-      <DataTable data={filteredEquipos} columns={columns} itemsPerPage={5} loading={loading} />
+          <StatsRow cols={3}>
+            <StatCard title="Total Equipos" value={equipos.length} icon={Shield} color="blue" loading={loading} />
+            <StatCard title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
+            <StatCard title="Inactivos" value={totalInactivos} icon={XCircle} color="red" loading={loading} />
+          </StatsRow>
+
+          <DataTable data={filteredEquipos} columns={columns} itemsPerPage={5} loading={loading} />
+        </>
+      )}
+
+      {vistaMode === 'campeonato' && (
+        <div className="space-y-6">
+          {/* Selector de campeonato */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Seleccionar Campeonato
+            </label>
+            <select
+              value={campeonatoVistaId}
+              onChange={(e) => handleCampeonatoVistaChange(e.target.value)}
+              className="w-full md:w-96 px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+            >
+              <option value="">Seleccionar campeonato...</option>
+              {campeonatosVista.map(c => (
+                <option key={c.id_campeonato} value={c.id_campeonato}>
+                  {c.nombre} {c.gestion ? `(${c.gestion})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Resultados */}
+          {loadingVistaCamp && (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600 mx-auto"></div>
+              <p className="mt-3 text-gray-500">Cargando equipos...</p>
+            </div>
+          )}
+
+          {!loadingVistaCamp && campeonatoVistaId && equiposCampeonato.length === 0 && (
+            <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+              <Shield size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 font-medium">No hay equipos inscritos en este campeonato</p>
+            </div>
+          )}
+
+          {!loadingVistaCamp && equiposCampeonato.length > 0 && (() => {
+            const porCategoria = equiposCampeonato.reduce((acc, eq) => {
+              const cat = eq.categoria?.nombre || 'Sin categoría';
+              if (!acc[cat]) acc[cat] = [];
+              acc[cat].push(eq);
+              return acc;
+            }, {});
+
+            return (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <span className="font-semibold text-gray-700 text-base">
+                    {equiposCampeonato.length} equipos inscritos
+                  </span>
+                  <span>·</span>
+                  <span>{Object.keys(porCategoria).length} categorías</span>
+                </div>
+
+                {Object.entries(porCategoria).map(([catNombre, eqs]) => (
+                  <div key={catNombre} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    {/* Cabecera de categoría */}
+                    <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-3 flex items-center justify-between">
+                      <h3 className="text-white font-bold text-base">{catNombre}</h3>
+                      <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                        {eqs.length} {eqs.length === 1 ? 'equipo' : 'equipos'}
+                      </span>
+                    </div>
+
+                    {/* Grid de equipos */}
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {eqs.map(eq => (
+                        <div
+                          key={eq.id_equipo}
+                          className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:border-indigo-200 hover:bg-indigo-50/40 transition-all"
+                        >
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                            <Shield size={20} className="text-indigo-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{eq.nombre}</p>
+                            <p className="text-xs text-gray-500 truncate">{eq.club?.nombre || 'Sin club'}</p>
+                          </div>
+                          <div className={`ml-auto w-2 h-2 rounded-full flex-shrink-0 ${eq.estado ? 'bg-green-500' : 'bg-red-400'}`} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <FormModal
         isOpen={isModalOpen}

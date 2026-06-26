@@ -190,6 +190,7 @@ export default function Dashboard() {
         <Header
           usuario={usuario}
           onLogout={handleLogout}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
 
         {/* Contenido de la página */}
