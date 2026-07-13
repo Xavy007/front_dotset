@@ -416,15 +416,6 @@ export function UsuariosPage() {
         throw new Error('El email no es válido');
       }
 
-      const validacionPassword = validarContraseñaSegura(formData.password);
-      if (!validacionPassword.valida) {
-        throw new Error(`Contraseña: ${validacionPassword.errores.join(', ')}`);
-      }
-
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error('Las contraseñas no coinciden');
-      }
-
       const bodyData = {
         persona: {
           ci: formData.ci,
@@ -439,7 +430,6 @@ export function UsuariosPage() {
         },
         usuario: {
           email: formData.email,
-          password: formData.password,
           rol: formData.rol || 'secretario',
         }
       };
@@ -723,102 +713,72 @@ const handleClubSubmit = async (formData) => {
 
   const getCreateUsuarioFields = () => {
     return [
-      { name: 'ci', label: 'CI', type: 'text', placeholder: 'Ej: 12345678', required: true, cols: 3 },
-      { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true, cols: 3 },
-      { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true, cols: 3 },
-      { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false, cols: 3 },
-      { name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false, cols: 2 },
+      // ── Datos personales ──────────────────────────────
+      { type: 'section', name: 'sec_persona', label: 'Datos Personales', cols: 12 },
+      { name: 'ci',     label: 'CI',              type: 'text',  placeholder: 'Ej: 12345678', required: true,  cols: 1 },
+      { name: 'nombre', label: 'Nombre',           type: 'text',  placeholder: 'Ej: Juan',     required: true,  cols: 1 },
+      { name: 'ap',     label: 'Apellido Paterno', type: 'text',  placeholder: 'Ej: García',   required: true,  cols: 1 },
+      { name: 'am',     label: 'Apellido Materno', type: 'text',  placeholder: 'Opcional',     required: false, cols: 1 },
+      { name: 'fnac',   label: 'Fecha de Nacimiento', type: 'date', required: false,            cols: 1 },
       {
-        name: 'genero',
-        label: 'Género',
-        type: 'select',
-        required: false,
-        placeholder: 'Seleccione un género',
-        cols: 2,
+        name: 'genero', label: 'Género', type: 'select', required: false,
+        placeholder: 'Seleccione un género', cols: 1,
         options: [
           { label: 'Masculino', value: 'masculino' },
-          { label: 'Femenino', value: 'femenino' },
-          { label: 'Otro', value: 'otro' },
+          { label: 'Femenino',  value: 'femenino'  },
+          { label: 'Otro',      value: 'otro'       },
         ],
       },
+      // ── Origen ───────────────────────────────────────
+      { type: 'section', name: 'sec_origen', label: 'Origen', cols: 12 },
       {
-        name: 'id_nacionalidad',
-        label: 'Nacionalidad',
-        type: 'select',
-        required: false,
-        placeholder: 'Seleccione una nacionalidad',
+        name: 'id_nacionalidad', label: 'Nacionalidad', type: 'select', required: false,
+        placeholder: 'Seleccione una nacionalidad', cols: 1,
         resetChildren: ['id_departamento', 'id_provincia_origen'],
-        cols: 2,
         options: nacionalidades,
       },
       {
-        name: "id_departamento",
-        label: "Departamento",
-        type: "select",
-        placeholder: 'Seleccione un departamento',
+        name: 'id_departamento', label: 'Departamento', type: 'select',
+        placeholder: 'Seleccione un departamento', cols: 1,
         resetChildren: ['id_provincia_origen'],
-        cols: 2,
         getDynamicOptions: (formData) => {
-          const nacionalidadId = formData.id_nacionalidad;
-          if (!nacionalidadId) return departamentos;
-          return departamentos.filter(
-            d => String(d.id_nacionalidad) === String(nacionalidadId)
-          );
+          const id = formData.id_nacionalidad;
+          if (!id) return departamentos;
+          return departamentos.filter(d => String(d.id_nacionalidad) === String(id));
         },
         options: departamentos,
       },
       {
-        name: "id_provincia_origen",
-        label: "Provincia",
-        type: "select",
-        placeholder: 'Seleccione una provincia',
-        cols: 2,
+        name: 'id_provincia_origen', label: 'Provincia', type: 'select',
+        placeholder: 'Seleccione una provincia', cols: 1,
         getDynamicOptions: (formData) => {
-          const departamentoId = formData.id_departamento;
-          if (!departamentoId) return provincias;
-          return provincias.filter(
-            p => String(p.id_departamento) === String(departamentoId)
-          );
+          const id = formData.id_departamento;
+          if (!id) return provincias;
+          return provincias.filter(p => String(p.id_departamento) === String(id));
         },
         options: provincias,
       },
+      // ── Acceso ────────────────────────────────────────
+      { type: 'section', name: 'sec_acceso', label: 'Acceso al Sistema', cols: 12 },
       { name: 'email', label: 'Email (Usuario)', type: 'email', placeholder: 'usuario@ejemplo.com', required: true, cols: 2 },
       {
-        name: 'rol',
-        label: 'Rol',
-        type: 'select',
-        required: true,
-        cols: 2,
+        name: 'rol', label: 'Rol', type: 'select', required: true, cols: 1,
         options: [
-          { label: 'Secretario', value: 'secretario' },
-          { label: 'Administrador', value: 'admin' },
-          { label: 'Presidente', value: 'presidente' },
+          { label: 'Secretario',       value: 'secretario'    },
+          { label: 'Administrador',    value: 'admin'          },
+          { label: 'Presidente',       value: 'presidente'     },
           { label: 'Presidente de Club', value: 'presidenteclub' },
-          { label: 'Representante', value: 'representante' },
-          { label: 'Planillero', value: 'juez' }
-        ]
+          { label: 'Representante',    value: 'representante'  },
+          { label: 'Planillero',       value: 'juez'           },
+        ],
       },
-      { 
-        name: 'password', 
-        label: 'Contraseña', 
-        type: 'password', 
-        placeholder: 'Mínimo 8 caracteres', 
-        required: true,
-        cols: 2,
-      },
-      { 
-        name: 'confirmPassword', 
-        label: 'Confirmar Contraseña', 
-        type: 'password', 
-        placeholder: 'Repite la contraseña', 
-        required: true,
-        cols: 2,
-      },
+      { type: 'section', name: 'sec_aviso', label: 'Se enviará un email de activación al usuario para que establezca su contraseña', cols: 12 },
     ];
   };
 
   const getPersonaFields = () => {
     return [
+      { type: 'section', name: 'sec_persona', label: 'Datos Personales', cols: 12 },
       { name: 'ci', label: 'CI', type: 'text', placeholder: 'XXXXXXX', required: true, cols: 1 },
       { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true, cols: 1 },
       { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: García', required: true, cols: 1 },
@@ -837,6 +797,7 @@ const handleClubSubmit = async (formData) => {
           { label: 'Otro', value: 'otro' },
         ],
       },
+      { type: 'section', name: 'sec_origen', label: 'Origen', cols: 12 },
       {
         name: 'id_nacionalidad',
         label: 'Nacionalidad',
@@ -1070,7 +1031,8 @@ const handleClubSubmit = async (formData) => {
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateUsuario}
         title="Crear Nuevo Usuario"
-        size="7xl"
+        size="5xl"
+        columns={3}
         fields={getCreateUsuarioFields()}
         initialData={{
           ci: '',
@@ -1083,9 +1045,7 @@ const handleClubSubmit = async (formData) => {
           id_provincia_origen: '',
           genero: '',
           email: '',
-          rol: 'secretario',
-          password: '',
-          confirmPassword: ''
+          rol: 'secretario'
         }}
       />
 
@@ -1096,7 +1056,8 @@ const handleClubSubmit = async (formData) => {
         onClose={() => { setIsPersonaModalOpen(false); setEditingUsuario(null); }}
         onSubmit={handlePersonaSubmit}
         title="Editar Datos Personales"
-        size="7xl"
+        size="5xl"
+        columns={3}
         fields={getPersonaFields()}
         initialData={getInitialDataForEdit(editingUsuario)}
       />

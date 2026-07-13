@@ -4,22 +4,25 @@
 // ===============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   MapPin, Plus, Search, AlertCircle,
   Pencil, Power, Trash2, Home, Users, Building2,
   CalendarDays, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
+import StatCard, { StatsRow } from '../components/StatCard';
 import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 import { API_BASE } from '../services/api.config.js';
 import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 export function CanchasPage() {
   const [canchas, setCanchas] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCancha, setEditingCancha] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('canchas:search', '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -102,7 +105,7 @@ export function CanchasPage() {
         ubicacion: formData.ubicacion || null,
         tipo: formData.tipo || 'coliseo',
         capacidad: formData.capacidad ? Number(formData.capacidad) : null,
-        estado: formData.estado === 'true' || formData.estado === true,
+        estado: editingCancha ? (formData.estado === 'true' || formData.estado === true) : true,
       };
 
       const method = editingCancha ? 'PUT' : 'POST';
@@ -115,8 +118,8 @@ export function CanchasPage() {
       });
 
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Error al guardar la cancha');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Error al guardar la cancha');
       }
 
       await fetchCanchas();
@@ -347,15 +350,15 @@ export function CanchasPage() {
   // FORMULARIO CAMPOS - MEJORADO CON COLS
   // ===============================================
   const formFields = [
-    { 
-      name: 'nombre', 
-      label: 'Nombre de la Cancha', 
-      type: 'text', 
+    {
+      name: 'nombre',
+      label: 'Nombre de la Cancha',
+      type: 'text',
       required: true,
-      cols: 2,
+      cols: 1,
       placeholder: 'Ej: Coliseo Municipal'
     },
-    { 
+    {
       name: 'tipo',
       label: 'Tipo de Cancha',
       type: 'select',
@@ -367,50 +370,39 @@ export function CanchasPage() {
         { label: '📍 Otro', value: 'otro' },
       ]
     },
-    { 
-      name: 'descripcion', 
-      label: 'Descripción', 
-      type: 'textarea', 
+    {
+      name: 'direccion',
+      label: 'Dirección',
+      type: 'text',
       required: false,
-      cols: 3,
-      rows: 3,
-      placeholder: 'Características, servicios, etc.'
-    },
-    { 
-      name: 'direccion', 
-      label: 'Dirección', 
-      type: 'text', 
-      required: false,
-      cols: 2,
+      cols: 1,
       placeholder: 'Calle, número, barrio'
     },
-    { 
-      name: 'capacidad', 
-      label: 'Capacidad (personas)', 
-      type: 'number', 
-      required: false, 
+    {
+      name: 'capacidad',
+      label: 'Capacidad (personas)',
+      type: 'number',
+      required: false,
       min: 0,
       cols: 1,
       placeholder: '0'
     },
-    { 
-      name: 'ubicacion', 
-      label: 'Ubicación (mapa o enlace)', 
-      type: 'text', 
+    {
+      name: 'ubicacion',
+      label: 'Ubicación (mapa o enlace)',
+      type: 'text',
       required: false,
-      cols: 2,
+      cols: 12,
       placeholder: 'https://maps.google.com/...'
     },
     {
-      name: 'estado',
-      label: 'Estado',
-      type: 'select',
-      required: true,
-      cols: 1,
-      options: [
-        { label: '✅ Activa', value: true },
-        { label: '❌ Inactiva', value: false },
-      ]
+      name: 'descripcion',
+      label: 'Descripción',
+      type: 'textarea',
+      required: false,
+      cols: 12,
+      rows: 3,
+      placeholder: 'Características, servicios, etc.'
     },
   ];
 
@@ -439,45 +431,29 @@ export function CanchasPage() {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Buscar cancha (nombre, tipo o dirección)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
+        <StatCard compact title="Total" value={canchas.length} icon={Building2} color="blue" loading={loading} />
+        <StatCard compact title="Activas" value={totalActivas} icon={CheckCircle2} color="green" loading={loading} />
+        <StatCard compact title="Inactivas" value={totalInactivas} icon={XCircle} color="red" loading={loading} />
+        <StatCard compact title="Coliseos / Abiertas" value={`${totalColiseos} / ${totalAbiertas}`} icon={Home} color="yellow" loading={loading} />
         {puedeCrearCancha && (
           <button
             onClick={() => { setEditingCancha(null); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg text-sm font-medium whitespace-nowrap"
           >
-            <Plus size={20} /> Nueva Cancha
+            <Plus size={16} /> Nueva Cancha
           </button>
         )}
-      </div>
-
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm">Total Canchas</p>
-          <p className="text-2xl font-bold text-gray-900">{canchas.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm">Activas</p>
-          <p className="text-2xl font-bold text-green-600">{totalActivas}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-red-500">
-          <p className="text-gray-600 text-sm">Inactivas</p>
-          <p className="text-2xl font-bold text-red-600">{totalInactivas}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
-          <p className="text-gray-600 text-sm">Coliseos / Abiertas</p>
-          <p className="text-2xl font-bold text-orange-600">{totalColiseos} / {totalAbiertas}</p>
-        </div>
       </div>
 
       <DataTable data={filteredCanchas} columns={columns} itemsPerPage={5} loading={loading} />
@@ -489,7 +465,7 @@ export function CanchasPage() {
         title={editingCancha ? '✏️ Editar Cancha' : '➕ Registrar Nueva Cancha'}
         fields={formFields}
         initialData={editingCancha || {}}
-        size="4xl"
+        size="xl"
       />
       {/* ── MODAL DISPONIBILIDAD ── */}
       {dispCancha && (

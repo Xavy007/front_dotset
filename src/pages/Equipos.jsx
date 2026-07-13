@@ -13,9 +13,11 @@ import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 import PageHeader from '../components/PageHeader';
 import StatCard, { StatsRow } from '../components/StatCard';
+import { usePersistedState } from '../hooks/usePersistedState';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE } from '../services/api.config.js';
 import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 export function EquiposPage() {
   const [equipos, setEquipos] = useState([]);
@@ -23,7 +25,7 @@ export function EquiposPage() {
   const [categorias, setCategorias] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEquipo, setEditingEquipo] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('equipos:search', '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -47,8 +49,8 @@ export function EquiposPage() {
   const [campeonatoSeleccionadoFiltro, setCampeonatoSeleccionadoFiltro] = useState(null);
 
   // Vista por campeonato
-  const [vistaMode, setVistaMode] = useState('lista');
-  const [campeonatoVistaId, setCampeonatoVistaId] = useState('');
+  const [vistaMode, setVistaMode] = usePersistedState('equipos:vistaMode', 'lista');
+  const [campeonatoVistaId, setCampeonatoVistaId] = usePersistedState('equipos:campeonatoId', '');
   const [campeonatosVista, setCampeonatosVista] = useState([]);
   const [equiposCampeonato, setEquiposCampeonato] = useState([]);
   const [loadingVistaCamp, setLoadingVistaCamp] = useState(false);
@@ -248,8 +250,8 @@ export function EquiposPage() {
       });
 
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Error al guardar el equipo');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Error al guardar el equipo');
       }
 
       await fetchEquipos();
@@ -684,24 +686,22 @@ export function EquiposPage() {
 
       {vistaMode === 'lista' && (
         <>
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="flex-1 min-w-48 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
                 placeholder="Buscar equipo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
-          </div>
 
-          <StatsRow cols={3}>
-            <StatCard title="Total Equipos" value={equipos.length} icon={Shield} color="blue" loading={loading} />
-            <StatCard title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
-            <StatCard title="Inactivos" value={totalInactivos} icon={XCircle} color="red" loading={loading} />
-          </StatsRow>
+            <StatCard compact title="Total Equipos" value={equipos.length} icon={Shield} color="blue" loading={loading} />
+            <StatCard compact title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
+            <StatCard compact title="Inactivos" value={totalInactivos} icon={XCircle} color="red" loading={loading} />
+          </div>
 
           <DataTable data={filteredEquipos} columns={columns} itemsPerPage={5} loading={loading} />
         </>

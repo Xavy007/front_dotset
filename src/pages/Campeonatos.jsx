@@ -25,7 +25,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, Plus, Search, Edit2, Trash2, X, Shuffle } from 'lucide-react';
+import { Trophy, Plus, Search, Edit2, Trash2, X, Shuffle, CheckCircle, Tag, LayoutList } from 'lucide-react';
+import StatCard from '../components/StatCard';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
 import ModalCategoriaCampeonato from '../components/ModalCategoriaCampeonato';
@@ -34,6 +35,7 @@ import { equipoService } from '../services/equipoService';
 import { categoriaService } from '../services/categoriaService';
 import { inscripcionService } from '../services/inscripcionService';
 import { toast } from 'sonner';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 /* ═══════════════════════════════════════════════════════════════════
    SECCIÓN: Recursos estáticos
@@ -230,7 +232,7 @@ export function CampeonatosPage() {
   const [editingCampeonato, setEditingCampeonato] = useState(null);
 
   /** Término de búsqueda para filtrar la tabla de campeonatos. */
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('campeonatos:search', '');
 
   /** Controla la visibilidad del modal de configuración de formato. */
   const [showFormatModal, setShowFormatModal] = useState(false);
@@ -906,7 +908,8 @@ export function CampeonatosPage() {
       label: 'Nombre del Campeonato',
       type: 'text',
       placeholder: 'Ej: Torneo Nacional 2024',
-      required: true
+      required: true,
+      cols: 12
     },
     {
       name: 'tipo',
@@ -914,13 +917,29 @@ export function CampeonatosPage() {
       type: 'select',
       placeholder: 'Selecciona el tipo',
       required: true,
+      cols: 1,
       options: [
         { value: 'campeonato', label: 'Campeonato' },
-        { value: 'liga', label: ' Liga' },
-        { value: 'copa', label: ' Copa' },
-        { value: 'relampago', label: ' Relámpago' },
+        { value: 'liga', label: 'Liga' },
+        { value: 'copa', label: 'Copa' },
+        { value: 'relampago', label: 'Relámpago' },
         { value: 'amistoso', label: 'Amistoso' },
         { value: 'torneo', label: 'Torneo' }
+      ]
+    },
+    {
+      name: 'estado',
+      label: 'Estado',
+      type: 'select',
+      placeholder: 'Selecciona el estado',
+      required: true,
+      cols: 1,
+      options: [
+        { value: 'programado', label: '📅 Programado' },
+        { value: 'en_curso', label: '▶️ En Curso' },
+        { value: 'finalizado', label: '✅ Finalizado' },
+        { value: 'suspendido', label: '⏸️ Suspendido' },
+        { value: 'cancelado', label: '❌ Cancelado' }
       ]
     },
     {
@@ -929,6 +948,7 @@ export function CampeonatosPage() {
       type: 'select',
       placeholder: 'Selecciona la gestión',
       required: true,
+      cols: 1,
       options: gestiones.map(g => ({
         value: g.id_gestion,
         label: `${g.gestion} - ${g.descripcion || ''}`
@@ -939,7 +959,8 @@ export function CampeonatosPage() {
       label: 'Fecha de Inicio',
       type: 'date',
       required: true,
-      allowFuture: true
+      allowFuture: true,
+      cols: 1
     },
     {
       name: 'fecha_fin',
@@ -947,29 +968,9 @@ export function CampeonatosPage() {
       type: 'date',
       required: true,
       allowFuture: true,
+      cols: 1,
       getMinDate: (formData) => formData.fecha_inicio || null,
     },
-    /*{
-      name: 'organizador',
-      label: 'Organizador',
-      type: 'text',
-      placeholder: 'Ej: Federación Boliviana',
-      required: true
-    },*/
-    {
-      name: 'estado',
-      label: 'Estado',
-      type: 'select',
-      placeholder: 'Selecciona el estado',
-      required: true,
-      options: [
-        { value: 'programado', label: '📅 Programado' },
-        { value: 'en_curso', label: '▶️ En Curso' },
-        { value: 'finalizado', label: '✅ Finalizado' },
-        { value: 'suspendido', label: '⏸️ Suspendido' },
-        { value: 'cancelado', label: '❌ Cancelado' }
-      ]
-    }
   ];
 
   // Mostrar estado de carga
@@ -1012,53 +1013,30 @@ export function CampeonatosPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o tipo..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre o tipo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
         </div>
+
+        <StatCard compact title="Total" value={campeonatos.length} icon={Trophy} color="blue" />
+        <StatCard compact title="Activos" value={campeonatos.filter(c => c.estado === 'Activo').length} icon={CheckCircle} color="green" />
+        <StatCard compact title="Tipos" value={new Set(campeonatos.map(c => c.tipo)).size} icon={Tag} color="purple" />
+        <StatCard compact title="Formatos" value={new Set(campeonatos.map(c => c.formato)).size} icon={LayoutList} color="yellow" />
 
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
         >
-          <Plus size={20} />
+          <Plus size={16} />
           Nuevo Campeonato
         </button>
-      </div>
-
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm">Total Campeonatos</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{campeonatos.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm">Activos</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">
-            {campeonatos.filter(c => c.estado === 'Activo').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
-          <p className="text-gray-600 text-sm">Tipos</p>
-          <p className="text-3xl font-bold text-purple-600 mt-2">
-            {new Set(campeonatos.map(c => c.tipo)).size}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
-          <p className="text-gray-600 text-sm">Total Formatos</p>
-          <p className="text-3xl font-bold text-orange-600 mt-2">
-            {new Set(campeonatos.map(c => c.formato)).size}
-          </p>
-        </div>
       </div>
 
       {/* Tabla de Datos */}

@@ -3,6 +3,8 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { handleLogout } from './utils/auth';
 import { puedeAccederModulo } from './utils/permissions';
+import { useSessionExpiry } from './hooks/useSessionExpiry';
+import SessionExpiryBanner from './components/SessionExpiryBanner';
 
 // Importar nuevos componentes del dashboard
 import VoleibolStatsGrid from './components/Voleibolstatsgrid';
@@ -73,6 +75,8 @@ export default function Dashboard() {
   const [userRol, setUserRol] = useState('');
   const [usuario, setUsuario] = useState(null);
 
+  const { showWarning, secondsLeft, renew } = useSessionExpiry();
+
   // Ajustar sidebar al cambiar tamaño de pantalla
   useEffect(() => {
     const handleResize = () => {
@@ -109,9 +113,18 @@ export default function Dashboard() {
     if (isMobile) setSidebarOpen(false);
   };
 
+  // Mapa de páginas cuyo ID de ruta difiere del nombre de módulo en PERMISSIONS
+  const PAGE_MODULES = {
+    'gestion-inscripciones': 'inscripciones',
+    'generar-fixture':       'campeonatos',
+    'gestion-partidos':      'partidos',
+    'tabla-posiciones':      'estadisticas',
+  };
+
   // Renderizar la página actual (valida permisos antes de renderizar)
   const renderPage = () => {
-    if (currentPage !== 'dashboard' && !puedeAccederModulo(currentPage)) {
+    const moduloEfectivo = PAGE_MODULES[currentPage] ?? currentPage;
+    if (currentPage !== 'dashboard' && !puedeAccederModulo(moduloEfectivo)) {
       return <DashboardPage />;
     }
     switch (currentPage) {
@@ -198,6 +211,10 @@ export default function Dashboard() {
           {renderPage()}
         </main>
       </div>
+
+      {showWarning && (
+        <SessionExpiryBanner secondsLeft={secondsLeft} onRenew={renew} />
+      )}
     </div>
   );
 }

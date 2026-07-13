@@ -4,6 +4,7 @@
 // ===============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { toast } from 'sonner';
 import {
   Users, Plus, Search, AlertCircle,
@@ -17,12 +18,13 @@ import StatCard, { StatsRow } from '../components/StatCard';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE, SERVER_URL } from '../services/api.config.js';
 import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 export function ClubesPage() {
   const [clubes, setClubes] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClub, setEditingClub] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('clubes:search', '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -558,10 +560,11 @@ export function ClubesPage() {
       )
     },
     
-    { 
-      name: 'facebook', 
-      label: '📘 Facebook', 
-      type: 'text', 
+    { type: 'section', name: 'sec_redes', label: 'Redes Sociales', cols: 12 },
+    {
+      name: 'facebook',
+      label: '📘 Facebook',
+      type: 'text',
       required: false,
       placeholder: 'https://facebook.com/club',
       cols: 1,
@@ -643,24 +646,22 @@ export function ClubesPage() {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Buscar club (nombre, email o sigla)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
-      </div>
 
-      <StatsRow cols={3}>
-        <StatCard title="Total Clubes" value={clubes.length} icon={Shield} color="blue" loading={loading} />
-        <StatCard title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
-        <StatCard title="Con Personería Jurídica" value={totalPersoneria} icon={FileCheck} color="yellow" loading={loading} />
-      </StatsRow>
+        <StatCard compact title="Total Clubes" value={clubes.length} icon={Shield} color="blue" loading={loading} />
+        <StatCard compact title="Activos" value={totalActivos} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard compact title="Con Personería" value={totalPersoneria} icon={FileCheck} color="yellow" loading={loading} />
+      </div>
 
       <DataTable data={filteredClubes} columns={columns} itemsPerPage={5} loading={loading} />
 
@@ -674,6 +675,7 @@ export function ClubesPage() {
         onSubmit={handleSubmit}
         title={editingClub ? 'Editar Club' : 'Registrar Nuevo Club'}
         size="4xl"
+        columns={3}
         fields={formFields}
         initialData={editingClub || {}}
       />

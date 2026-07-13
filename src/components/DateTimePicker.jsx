@@ -48,7 +48,7 @@ import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon } from 'luci
  *                                            renderizan deshabilitados.
  * @returns {JSX.Element} Componente de selección de fecha/hora.
  */
-export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFuture = false, minDate = null }) => {
+export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFuture = false, minDate = null, maxDate = null }) => {
 
   /* ─────────────────────────────────────────────────
    * Estado del componente
@@ -147,6 +147,12 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
   /** Referencia al contenedor raíz para detectar clics externos. */
   const containerRef = useRef(null);
 
+  /** Texto que muestra el input; permite edición manual en formato dd/mm/yyyy. */
+  const [inputText, setInputText] = useState(() => {
+    const d = parseValue(value);
+    return d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : '';
+  });
+
   /* ─────────────────────────────────────────────────
    * Sincronización con prop `value` (controlled component)
    *
@@ -156,7 +162,6 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
    * ───────────────────────────────────────────────── */
   useEffect(() => {
     const parsedDate = parseValue(value);
-
     if (parsedDate) {
       setSelectedDate(parsedDate);
       setHours(parsedDate.getHours());
@@ -164,6 +169,9 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
       setSelectedYear(parsedDate.getFullYear());
       setSelectedMonth(parsedDate.getMonth());
       setCurrentDate(parsedDate);
+      setInputText(`${String(parsedDate.getDate()).padStart(2,'0')}/${String(parsedDate.getMonth()+1).padStart(2,'0')}/${parsedDate.getFullYear()}`);
+    } else {
+      setInputText('');
     }
   }, [value]);
 
@@ -240,16 +248,17 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
    * independientemente de la hora en que fue registrada la fecha mínima.
    * Se usa una IIFE para encapsular el proceso y obtener un valor inmutable.
    * ───────────────────────────────────────────────── */
-  const parsedMinDate = (() => {
-    if (!minDate) return null;
-    const str = typeof minDate === 'string'
-      ? (minDate.includes('T') ? minDate : `${minDate}T00:00:00`)
+  const parseLimit = (limit) => {
+    if (!limit) return null;
+    const str = typeof limit === 'string'
+      ? (limit.includes('T') ? limit : `${limit}T00:00:00`)
       : null;
-    const d = str ? new Date(str) : (minDate instanceof Date ? minDate : null);
+    const d = str ? new Date(str) : (limit instanceof Date ? limit : null);
     if (!d || isNaN(d.getTime())) return null;
-    // Normalizar a medianoche local para comparar solo por fecha
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  })();
+  };
+  const parsedMinDate = parseLimit(minDate);
+  const parsedMaxDate = parseLimit(maxDate);
 
   /* ─────────────────────────────────────────────────
    * Lógica de restricción de días
@@ -266,16 +275,12 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
    */
   const isDayDisabled = (day) => {
     const candidate = new Date(selectedYear, selectedMonth, day);
-
-    // Restricción de fecha mínima (encadenamiento de campos de fecha)
     if (parsedMinDate && candidate < parsedMinDate) return true;
-
-    // Restricción de fechas futuras (campos de registro histórico)
-    if (!allowFuture) {
+    if (parsedMaxDate && candidate > parsedMaxDate) return true;
+    if (!allowFuture && !parsedMaxDate) {
       const todayNorm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       if (candidate > todayNorm) return true;
     }
-
     return false;
   };
 
@@ -303,9 +308,9 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
     setSelectedDate(newDate);
 
     if (format === 'dd/mm/yyyy') {
-      // Emitir en formato ISO para compatibilidad con el backend (campo DATE de SQL)
       const formatted = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
       onChange(formatted);
+      setInputText(`${String(newDate.getDate()).padStart(2,'0')}/${String(newDate.getMonth()+1).padStart(2,'0')}/${newDate.getFullYear()}`);
       setIsOpen(false);
     } else {
       // En modo datetime, continuar a la selección de hora
@@ -367,8 +372,10 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
    * Comienza en 1950 (cubre fechas de nacimiento y registros históricos)
    * y termina en `maxYear`, calculado según el prop `allowFuture`.
    */
+  const yearRangeStart = parsedMinDate ? parsedMinDate.getFullYear() : 1950;
+  const yearRangeEnd   = parsedMaxDate ? parsedMaxDate.getFullYear() : maxYear;
   const yearRange = [];
-  for (let year = 1950; year <= maxYear; year++) {
+  for (let year = yearRangeStart; year <= yearRangeEnd; year++) {
     yearRange.push(year);
   }
 
@@ -378,21 +385,42 @@ export const DateTimePicker = ({ value, onChange, format = 'dd/mm/yyyy', allowFu
   return (
     <div className="relative w-full" ref={containerRef}>
 
-      {/* ── Campo de texto de solo lectura que actúa como disparador del panel ── */}
+      {/* ── Campo de texto editable: permite escribir o abrir el calendario ── */}
       <input
         type="text"
-        value={selectedDate ? formatDate(selectedDate) : ''}
-        onChange={() => {}}
-        onClick={() => setIsOpen(!isOpen)}
-        placeholder={format}
+        value={inputText}
+        placeholder="dd/mm/aaaa"
+        onChange={(e) => {
+          const raw = e.target.value;
+          setInputText(raw);
+          // Parsear cuando la longitud alcanza dd/mm/yyyy (10 chars)
+          const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (match) {
+            const [, d, m, y] = match.map(Number);
+            const candidate = new Date(y, m - 1, d);
+            // Verificar que la fecha sea válida (evita 31/02/2000 etc)
+            if (!isNaN(candidate.getTime()) && candidate.getDate() === d) {
+              const norm = new Date(y, m - 1, d);
+              if (parsedMinDate && norm < parsedMinDate) return;
+              if (parsedMaxDate && norm > parsedMaxDate) return;
+              const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+              onChange(iso);
+              setSelectedDate(candidate);
+              setSelectedYear(y);
+              setSelectedMonth(m - 1);
+            }
+          }
+          if (raw === '') { onChange(''); setSelectedDate(null); }
+        }}
+        onFocus={() => setIsOpen(true)}
+        maxLength={10}
         className={`
           w-full px-0 py-3 sm:py-2.5 bg-transparent text-gray-900 text-base sm:text-sm
           border-b-2 transition-all duration-300
-          focus:outline-none cursor-pointer font-medium
+          focus:outline-none font-medium
           placeholder-gray-400
           ${isOpen ? 'border-blue-500' : 'border-gray-300 hover:border-gray-400'}
         `}
-        readOnly
       />
 
       {/* ── Ícono indicador del tipo de campo (reloj para datetime, calendario para date) ── */}

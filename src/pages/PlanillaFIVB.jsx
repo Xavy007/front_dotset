@@ -314,6 +314,7 @@ export function PlanillaFIVB() {
       rotacionesB: createEmptyRotaciones(),
       horaInicio: '',
       horaFin: '',
+      sustituciones: [],
     };
   }
 
@@ -498,6 +499,9 @@ export function PlanillaFIVB() {
               });
             }
           }
+
+          // Sustituciones del set desde planilla completa
+          setsActualizados[idx].sustituciones = s.sustituciones || [];
         }
       });
 
@@ -792,6 +796,45 @@ export function PlanillaFIVB() {
           </div>
         </div>
       </div>
+
+      {/* Sustituciones FIVB — máx. 6 por equipo por set (excluye líbero) */}
+      {(() => {
+        const MAX_SUBS = 6;
+        const subsA = (setData.sustituciones || [])
+          .filter(s => s.equipo === 'local' && s.tipo_sustitucion !== 'libero')
+          .sort((a, b) => (a.numero_sustitucion || 0) - (b.numero_sustitucion || 0));
+        const subsB = (setData.sustituciones || [])
+          .filter(s => s.equipo === 'visitante' && s.tipo_sustitucion !== 'libero')
+          .sort((a, b) => (a.numero_sustitucion || 0) - (b.numero_sustitucion || 0));
+        return (
+          <table className="t-sust">
+            <thead>
+              <tr>
+                <th className="sust-eq-h">SUST.</th>
+                {Array.from({ length: MAX_SUBS }, (_, i) => <th key={i} className="sust-num-h">{i + 1}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="sust-eq">{teamALabel}<br/>Sale</td>
+                {Array.from({ length: MAX_SUBS }, (_, i) => <td key={i} className="sust-cell">{subsA[i]?.jugador_sale?.dorsal ?? ''}</td>)}
+              </tr>
+              <tr>
+                <td className="sust-eq">{teamALabel}<br/>Entra</td>
+                {Array.from({ length: MAX_SUBS }, (_, i) => <td key={i} className="sust-cell">{subsA[i]?.jugador_entra?.dorsal ?? ''}</td>)}
+              </tr>
+              <tr>
+                <td className="sust-eq">{teamBLabel}<br/>Sale</td>
+                {Array.from({ length: MAX_SUBS }, (_, i) => <td key={i} className="sust-cell">{subsB[i]?.jugador_sale?.dorsal ?? ''}</td>)}
+              </tr>
+              <tr>
+                <td className="sust-eq">{teamBLabel}<br/>Entra</td>
+                {Array.from({ length: MAX_SUBS }, (_, i) => <td key={i} className="sust-cell">{subsB[i]?.jugador_entra?.dorsal ?? ''}</td>)}
+              </tr>
+            </tbody>
+          </table>
+        );
+      })()}
       </div>
     );
   };
@@ -1496,10 +1539,49 @@ export function PlanillaFIVB() {
         .set-box {
           border: var(--borde-negro);
           height: var(--altura-set);
-          margin-bottom: 5px;
+          margin-bottom: 0;
           display: grid;
           grid-template-columns: 25px 1fr 30px 30px 1fr 25px;
           overflow: hidden;
+        }
+
+        .t-sust {
+          width: 100%;
+          border-collapse: collapse;
+          border: var(--borde-negro);
+          border-top: none;
+          font-size: 8px;
+          margin-bottom: 5px;
+          table-layout: fixed;
+        }
+        .t-sust th, .t-sust td {
+          border: 1px solid #aaa;
+          text-align: center;
+          padding: 1px 2px;
+          line-height: 1.2;
+          overflow: hidden;
+        }
+        .sust-eq-h {
+          background: #1e3a5f;
+          color: white;
+          font-size: 7px;
+          white-space: nowrap;
+          width: 36px;
+        }
+        .sust-num-h {
+          background: #dce4ef;
+          font-weight: bold;
+        }
+        .sust-eq {
+          background: #f0f4f8;
+          font-weight: bold;
+          font-size: 7px;
+          white-space: nowrap;
+        }
+        .sust-cell {
+          font-weight: bold;
+          font-size: 8px;
+          min-height: 14px;
         }
 
         .set-lat {

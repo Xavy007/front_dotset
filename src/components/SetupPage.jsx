@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
+import { traducirError } from '../utils/traducirError';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -58,7 +59,7 @@ export default function SetupPage({ onComplete }) {
       if (!res.ok) throw new Error(data.message || 'Error al guardar');
       onComplete();
     } catch (err) {
-      setError(err.message);
+      setError(traducirError(err.message));
     } finally {
       setLoading(false);
     }

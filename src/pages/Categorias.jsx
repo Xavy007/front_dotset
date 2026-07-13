@@ -4,6 +4,7 @@
 // ===============================================
 
 import React, { useState, useEffect } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   Plus, Search, AlertCircle, Pencil, Power, Trash2, Tag, CheckCircle, XCircle, Users
 } from 'lucide-react';
@@ -15,12 +16,13 @@ import StatCard, { StatsRow } from '../components/StatCard';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE } from '../services/api.config.js';
 import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 export function CategoriasPage() {
   const [categorias, setCategorias] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategoria, setEditingCategoria] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('categorias:search', '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedColor, setSelectedColor] = useState('#3B82F6');
@@ -130,8 +132,8 @@ const handleSubmit = async (formData) => {
       });
 
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Error al actualizar la categoría');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Error al actualizar la categoría');
       }
 
       await fetchCategorias();
@@ -183,8 +185,8 @@ const handleSubmit = async (formData) => {
       });
 
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Error al guardar');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Error al guardar');
       }
 
       resultados.push(nombreCompleto);
@@ -668,26 +670,24 @@ const handleSubmit = async (formData) => {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Buscar categoría..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
+        <StatCard compact title="Total" value={categorias.length} icon={Tag} color="blue" loading={loading} />
+        <StatCard compact title="Activas" value={totalActivas} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard compact title="Inactivas" value={totalInactivas} icon={XCircle} color="red" loading={loading} />
+        <StatCard compact title="Masculinas" value={totalMasculinas} icon={Users} color="blue" loading={loading} />
+        <StatCard compact title="Femeninas" value={totalFemeninas} icon={Users} color="purple" loading={loading} />
+        <StatCard compact title="Mixtas" value={totalMixtas} icon={Users} color="yellow" loading={loading} />
       </div>
-
-      <StatsRow cols={5}>
-        <StatCard title="Total Categorías" value={categorias.length} icon={Tag} color="blue" loading={loading} />
-        <StatCard title="Activas" value={totalActivas} icon={CheckCircle} color="green" loading={loading} />
-        <StatCard title="Inactivas" value={totalInactivas} icon={XCircle} color="red" loading={loading} />
-        <StatCard title="Masculinas" value={totalMasculinas} icon={Users} color="blue" loading={loading} />
-        <StatCard title="Femeninas / Mixtas" value={totalFemeninas + totalMixtas} icon={Users} color="purple" loading={loading} />
-      </StatsRow>
 
       <DataTable data={filteredCategorias} columns={columns} itemsPerPage={5} loading={loading} />
 

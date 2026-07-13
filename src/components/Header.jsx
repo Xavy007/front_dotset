@@ -32,7 +32,7 @@ export function Header({ usuario, onLogout, onToggleSidebar }) {
         </button>
 
         {/* Menú de usuario */}
-        <div className="relative" ref={ref}>
+        <div className="relative ml-auto" ref={ref}>
           <button
             onClick={() => setOpen(!open)}
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"

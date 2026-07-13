@@ -7,6 +7,7 @@ export default function LoginFuturistic() {
   const [pass, setPass] = useState('')
   const [show, setShow] = useState('')
   const [error, setError] = useState('')
+  const [recuerdame, setRecuerdame] = useState(false)
   const [attempts, setAttempts] = useState(0)
   const [isBlocked, setIsBlocked] = useState(false)
   const [blockTime, setBlockTime] = useState(null)
@@ -124,19 +125,27 @@ export default function LoginFuturistic() {
       })
 
       const data = await response.json()
-      console.log(data)
       if (response.ok) {
         
         localStorage.removeItem('loginAttempts')
         localStorage.removeItem('loginBlocked')
         localStorage.removeItem('blockedUntil')
         
-        // Guardar token y datos del usuario (por pestaña — sessionStorage)
+        // Guardar token y datos del usuario
         if (data.token) {
           sessionStorage.setItem('token', data.token)
+          if (recuerdame) localStorage.setItem('token', data.token)
         }
 
         if (data.usuario) {
+          if (data.usuario.rol === 'juez') {
+            // Los jueces solo acceden a la app Android, no al sistema web
+            const nombre = data.usuario.nombre || 'Estimado/a juez'
+            setError(`${nombre}, usted no tiene acceso a la plataforma web. Por favor utilice la aplicación móvil DotSet.`)
+            sessionStorage.removeItem('token')
+            localStorage.removeItem('token')
+            return
+          }
           sessionStorage.setItem('usuario', JSON.stringify(data.usuario))
         }
 
@@ -302,8 +311,14 @@ export default function LoginFuturistic() {
             </label>
 
             <div className="mt-1 flex items-center justify-between text-sm text-white/70">
-              <label className="inline-flex items-center gap-2 select-none">
-                <input type="checkbox" className="size-4 accent-[--color-neon]" disabled={isBlocked || loading} />
+              <label className="inline-flex items-center gap-2 select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[--color-neon]"
+                  checked={recuerdame}
+                  onChange={e => setRecuerdame(e.target.checked)}
+                  disabled={isBlocked || loading}
+                />
                 Recuérdame
               </label>
               <button type="button" onClick={() => navigate('/reset')}

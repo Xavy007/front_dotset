@@ -5,6 +5,7 @@
 // ===============================================
 
 import React, { useState, useEffect } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { Users, Plus, Search, AlertCircle, CheckCircle, Award } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
@@ -133,7 +134,7 @@ export function JuecesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingJuez, setEditingJuez] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('jueces:search', '');
   const [confirm, setConfirm] = useState({ open: false, id: null });
 
   const _rol = getUsuarioActual()?.rol || '';
@@ -506,13 +507,15 @@ export function JuecesPage() {
   ];
 
   const getJuezFields = (isEditMode = false) => [
+    // ── Datos personales ──────────────────────────────
+    { type: 'section', name: 'sec_personal', label: 'Datos Personales', cols: 12 },
     {
       name: 'ci',
       label: 'CI',
       type: 'text',
       placeholder: 'Ej: 12345678',
       required: !isEditMode,
-      cols: 3
+      cols: 1
     },
     {
       name: 'nombre',
@@ -520,7 +523,7 @@ export function JuecesPage() {
       type: 'text',
       placeholder: 'Ej: Juan',
       required: true,
-      cols: 3
+      cols: 1
     },
     {
       name: 'ap',
@@ -528,7 +531,7 @@ export function JuecesPage() {
       type: 'text',
       placeholder: 'Ej: Pérez',
       required: true,
-      cols: 3
+      cols: 1
     },
     {
       name: 'am',
@@ -536,14 +539,14 @@ export function JuecesPage() {
       type: 'text',
       placeholder: 'Opcional',
       required: false,
-      cols: 3
+      cols: 1
     },
     {
       name: 'fnac',
       label: 'Fecha de Nacimiento',
       type: 'date',
       required: false,
-      cols: 3
+      cols: 1
     },
     {
       name: 'genero',
@@ -551,7 +554,7 @@ export function JuecesPage() {
       type: 'select',
       required: false,
       placeholder: 'Seleccione un género',
-      cols: 3,
+      cols: 1,
       options: [
         { label: 'Masculino', value: 'masculino' },
         { label: 'Femenino', value: 'femenino' },
@@ -564,7 +567,7 @@ export function JuecesPage() {
       type: 'select',
       required: false,
       placeholder: 'Seleccione una nacionalidad',
-      cols: 3,
+      cols: 1,
       options: nacionalidades,
       resetChildren: ['id_departamento', 'id_provincia_origen']
     },
@@ -573,7 +576,7 @@ export function JuecesPage() {
       label: 'Departamento',
       type: 'select',
       placeholder: 'Seleccione un departamento',
-      cols: 3,
+      cols: 1,
       getDynamicOptions: (formData) => {
         const nacionalidadId = formData.id_nacionalidad;
         if (!nacionalidadId) return departamentos;
@@ -589,7 +592,7 @@ export function JuecesPage() {
       label: 'Provincia',
       type: 'select',
       placeholder: 'Seleccione una provincia',
-      cols: 3,
+      cols: 1,
       getDynamicOptions: (formData) => {
         const departamentoId = formData.id_departamento;
         if (!departamentoId) return provincias;
@@ -599,18 +602,14 @@ export function JuecesPage() {
       },
       options: provincias
     },
-    {
-      name: 'certificacion',
-      label: 'Tiene certificación oficial',
-      type: 'checkbox',
-      cols: 3
-    },
+    // ── Perfil como juez ──────────────────────────────
+    { type: 'section', name: 'sec_juez', label: 'Perfil como Juez', cols: 12 },
     {
       name: 'juez_categoria',
       label: 'Tipo de juez',
       type: 'select',
       required: true,
-      cols: 3,
+      cols: 1,
       options: [
         { label: 'Juez (central)', value: 'juez' },
         { label: 'Juez de línea', value: 'juez_linea' }
@@ -621,7 +620,7 @@ export function JuecesPage() {
       label: 'Grado',
       type: 'select',
       required: true,
-      cols: 3,
+      cols: 1,
       options: [
         { label: 'Municipal', value: 'municipal' },
         { label: 'Departamental', value: 'departamental' },
@@ -634,7 +633,7 @@ export function JuecesPage() {
       label: 'Estado como juez',
       type: 'select',
       required: true,
-      cols: 3,
+      cols: 1,
       options: [
         { label: 'Activo', value: 'activo' },
         { label: 'Suspendido', value: 'suspendido' },
@@ -646,21 +645,29 @@ export function JuecesPage() {
       label: 'Fecha inicio como juez',
       type: 'date',
       required: false,
-      cols: 3
+      cols: 1
     },
     {
       name: 'fecha_fin',
       label: 'Fecha fin (si aplica)',
       type: 'date',
       required: false,
-      cols: 3
+      cols: 1
     },
+    {
+      name: 'certificacion',
+      label: 'Tiene certificación oficial',
+      type: 'checkbox',
+      cols: 1
+    },
+    // ── Observaciones ─────────────────────────────────
+    { type: 'section', name: 'sec_notas', label: 'Notas', cols: 12 },
     {
       name: 'observaciones',
       label: 'Observaciones',
       type: 'textarea',
       required: false,
-      placeholder: 'Notas, sanciones, etc.',
+      placeholder: 'Notas, sanciones, historial, etc.',
       rows: 3,
       cols: 12
     }
@@ -707,54 +714,31 @@ export function JuecesPage() {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar juez por nombre o CI..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar juez por nombre o CI..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
         </div>
+
+        <StatCard compact title="Total Jueces" value={jueces.length} icon={Users} color="blue" loading={loading} />
+        <StatCard compact title="Activos" value={jueces.filter(j => j.estado_juez === 'activo').length} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard compact title="Certificados" value={jueces.filter(j => j.certificacion).length} icon={Award} color="yellow" loading={loading} />
 
         {puedeCrearJuez && (
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
-            <Plus size={20} />
+            <Plus size={16} />
             Nuevo Juez
           </button>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Total Jueces</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : jueces.length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Activos</p>
-          <p className="text-2xl font-bold text-green-600">
-            {loading
-              ? '...'
-              : jueces.filter((j) => j.estado_juez === 'activo').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Con certificación</p>
-          <p className="text-2xl font-bold text-blue-600">
-            {loading
-              ? '...'
-              : jueces.filter((j) => j.certificacion).length}
-          </p>
-        </div>
       </div>
 
       <DataTable
@@ -772,6 +756,7 @@ export function JuecesPage() {
         onSubmit={handleCreateJuez}
         title="Crear Nuevo Juez"
         size="5xl"
+        columns={3}
         fields={getJuezFields(false)}
         initialData={{
           ci: '',
@@ -804,6 +789,7 @@ export function JuecesPage() {
           onSubmit={handleEditJuez}
           title="Editar Juez"
           size="5xl"
+          columns={3}
           fields={getJuezFields(true)}
           initialData={{
             ci: editingJuez.ci,

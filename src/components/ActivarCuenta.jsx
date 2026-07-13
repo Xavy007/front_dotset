@@ -1,6 +1,20 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/api.config';
+import { traducirError } from '../utils/traducirError';
+
+const getPasswordStrength = (pwd) => {
+  if (!pwd) return null;
+  let score = 0;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  if (score <= 1) return { level: 1, label: 'Débil', color: 'bg-red-500', text: 'text-red-400' };
+  if (score === 2) return { level: 2, label: 'Regular', color: 'bg-yellow-500', text: 'text-yellow-400' };
+  if (score === 3) return { level: 3, label: 'Buena', color: 'bg-blue-400', text: 'text-blue-400' };
+  return { level: 4, label: 'Excelente', color: 'bg-green-500', text: 'text-green-400' };
+};
 
 export default function ActivarCuenta() {
   const { token } = useParams();
@@ -38,7 +52,7 @@ export default function ActivarCuenta() {
       setExito(true);
       setTimeout(() => navigate('/'), 3000);
     } catch (err) {
-      setError(err.message);
+      setError(traducirError(err.message));
     } finally {
       setLoading(false);
     }
@@ -127,6 +141,21 @@ export default function ActivarCuenta() {
                     </button>
                   </div>
                 </label>
+
+                {/* Indicador de fortaleza */}
+                {password && (() => {
+                  const s = getPasswordStrength(password);
+                  return (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex gap-1">
+                        {[1,2,3,4].map(i => (
+                          <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= s.level ? s.color : 'bg-white/20'}`} />
+                        ))}
+                      </div>
+                      <p className={`text-xs ${s.text}`}>Fortaleza: {s.label} {s.level < 3 ? '— agregá mayúsculas, números o símbolos' : ''}</p>
+                    </div>
+                  );
+                })()}
 
                 {/* Confirmar contraseña */}
                 <label className="block text-sm">

@@ -8,13 +8,14 @@ export const PERMISSIONS = {
     asociacion: ['leer', 'actualizar'],
     usuarios: ['crear', 'leer', 'actualizar', 'eliminar', 'cambiar_estado', 'cambiar_rol'],
     jugadores: ['crear', 'leer', 'actualizar', 'eliminar'],
-    gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
+    gestiones: ['crear', 'leer', 'actualizar', 'eliminar'],
     eqtecnico: ['crear', 'leer', 'actualizar', 'eliminar'],
     jueces: ['crear', 'leer', 'actualizar', 'eliminar'],
     categorias: ['crear', 'leer', 'actualizar', 'eliminar'],
     club: ['crear', 'leer', 'actualizar', 'eliminar'],
     equipos: ['crear', 'leer', 'actualizar', 'eliminar'],
     campeonatos: ['crear', 'leer', 'actualizar', 'eliminar'],
+    inscripciones: ['crear', 'leer', 'actualizar', 'eliminar'],
     canchas: ['crear', 'leer', 'actualizar', 'eliminar'],
     partidos: ['crear', 'leer', 'actualizar', 'eliminar'],
     reportes: ['leer'],
@@ -24,7 +25,7 @@ export const PERMISSIONS = {
 
   secretario: {
     dashboard: ['leer'],
-    gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
+    gestiones: ['crear', 'leer', 'actualizar', 'eliminar'],
     jugadores: ['crear', 'leer', 'actualizar'],
     eqtecnico: ['crear', 'leer', 'actualizar'],
     jueces: ['leer'],
@@ -32,6 +33,7 @@ export const PERMISSIONS = {
     club: ['leer', 'actualizar'],
     equipos: ['crear', 'leer', 'actualizar'],
     campeonatos: ['leer'],
+    inscripciones: ['crear', 'leer', 'actualizar'],
     canchas: ['leer'],
     partidos: ['crear', 'leer', 'actualizar'],
     reportes: ['leer'],
@@ -39,8 +41,8 @@ export const PERMISSIONS = {
   },
 
   presidente: {
-    gestiones:['crear', 'leer', 'actualizar', 'eliminar'],
     dashboard: ['leer'],
+    gestiones: ['crear', 'leer', 'actualizar', 'eliminar'],
     jugadores: ['leer'],
     eqtecnico: ['leer'],
     jueces: ['leer'],
@@ -48,6 +50,7 @@ export const PERMISSIONS = {
     club: ['leer'],
     equipos: ['leer'],
     campeonatos: ['crear', 'leer', 'actualizar'],
+    inscripciones: ['crear', 'leer', 'actualizar'],
     canchas: ['leer'],
     partidos: ['leer'],
     reportes: ['leer'],
@@ -57,32 +60,25 @@ export const PERMISSIONS = {
 
   presidenteclub: {
     dashboard: ['leer'],
-    jugadores: ['crear', 'leer', 'actualizar'], // Solo de su club
-    eqtecnico: ['crear', 'leer', 'actualizar'], // Solo de su club
-    club: ['leer'], // Solo su club
-    equipos: ['leer'], // Solo sus equipos
-    campeonatos: ['leer'],
+    jugadores: ['crear', 'leer', 'actualizar'],
+    eqtecnico: ['crear', 'leer', 'actualizar'],
+    club: ['leer', 'actualizar'],
+    equipos: ['crear', 'leer', 'actualizar'],
+    inscripciones: ['crear', 'leer'],
     partidos: ['leer'],
-    reportes: ['leer'],
     estadisticas: ['leer'],
   },
 
   representante: {
     dashboard: ['leer'],
-    jugadores: ['leer'], // Solo de su club
-    equipos: ['leer'], // Solo sus equipos
-    campeonatos: ['leer'],
+    jugadores: ['leer'],
+    equipos: ['leer'],
+    inscripciones: ['leer'],
     partidos: ['leer'],
     estadisticas: ['leer'],
   },
 
-  juez: {
-    dashboard: ['leer'],
-    partidos: ['leer', 'actualizar'], // Solo registrar resultados
-    campeonatos: ['leer'],
-    canchas: ['leer'],
-    estadisticas: ['leer'],
-  }
+  // juez: solo accede a la app Android (dotset), no al sistema web
 };
 
 // Verificar si el usuario tiene permiso

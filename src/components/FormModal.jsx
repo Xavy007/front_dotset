@@ -60,7 +60,8 @@ export default function FormModal({
   subtitle,
   fields = [],
   initialData = null,
-  size = 'mega',
+  size = '2xl',
+  columns = 2,
   submitText,
   submitDisabled
 }) {
@@ -205,8 +206,42 @@ export default function FormModal({
    *
    * @param {React.FormEvent} e - Evento nativo de submit del formulario.
    */
+  const validateForm = () => {
+    const newErrors = {};
+    fieldsArray.forEach(field => {
+      if (!field.required || field.type === 'custom' || field.type === 'section') return;
+      if (field.type === 'file') {
+        if (!fileObjects[field.name]) newErrors[field.name] = 'Selecciona un archivo';
+      } else if (field.type === 'date' || field.type === 'datetime') {
+        if (!formData[field.name]) newErrors[field.name] = 'La fecha es requerida';
+      } else if (field.type === 'select') {
+        if (!formData[field.name]) newErrors[field.name] = 'Selecciona una opción';
+      } else if (field.type === 'toggle') {
+        // toggles no necesitan validación de vacío
+      } else if (field.type === 'checkbox') {
+        if (!Array.isArray(formData[field.name]) || formData[field.name].length === 0)
+          newErrors[field.name] = 'Selecciona al menos una opción';
+      } else {
+        const val = formData[field.name];
+        if (!val || (typeof val === 'string' && !val.trim()))
+          newErrors[field.name] = 'Este campo es requerido';
+      }
+    });
+    return newErrors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const touched = {};
+      Object.keys(newErrors).forEach(k => { touched[k] = true; });
+      setTouchedFields(prev => ({ ...prev, ...touched }));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Combinar valores de texto/select/date con archivos File
@@ -407,6 +442,21 @@ export default function FormModal({
     switch (field.type) {
 
       /* ──────────────────────────────────────────
+         Tipo: section
+         Separador visual con título de sección.
+         Usar con cols:12 para abarcar toda la fila.
+      ────────────────────────────────────────── */
+      case 'section':
+        return (
+          <div className="pt-3 pb-1 border-b-2 border-gray-100">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">{field.label}</h3>
+            {field.description && (
+              <p className="text-xs text-gray-400 mt-0.5">{field.description}</p>
+            )}
+          </div>
+        );
+
+      /* ──────────────────────────────────────────
          Tipo: date / datetime
          Delega en DateTimePicker, que gestiona la
          interfaz de calendario internamente.
@@ -431,7 +481,8 @@ export default function FormModal({
               onChange={(date) => handleFieldChange(field.name, date)}
               format={field.type === 'datetime' ? 'dd/mm/yyyy hh:mm' : 'dd/mm/yyyy'}
               allowFuture={field.allowFuture || false}
-              minDate={field.getMinDate ? field.getMinDate(formData) : undefined}
+              minDate={field.getMinDate ? field.getMinDate(formData) : (field.minDate || undefined)}
+              maxDate={field.maxDate || undefined}
             />
 
             {hasError && (
@@ -1052,7 +1103,7 @@ export default function FormModal({
 
         {/* ── Cuerpo del modal: formulario con scroll independiente ── */}
         <div className="overflow-y-auto flex-1">
-          <form onSubmit={handleSubmit} className="px-8 sm:px-6 py-8 sm:py-4 space-y-6 sm:space-y-4">
+          <form id="modal-form" onSubmit={handleSubmit} className="px-8 sm:px-6 py-8 sm:py-4 space-y-6 sm:space-y-4">
 
             {/*
               Grilla responsiva de campos:
@@ -1061,13 +1112,13 @@ export default function FormModal({
               - 3 columnas en desktop (lg)
               Cada campo puede especificar su span con la prop `cols` (1, 2, 3 o 12/fullWidth).
             */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-5">
+            <div className={`grid grid-cols-1 gap-8 sm:gap-5 ${columns >= 2 ? 'md:grid-cols-2' : ''} ${columns >= 3 ? 'lg:grid-cols-3' : ''}`}>
               {fieldsArray.map((field) => {
                 let colSpanClass = '';
-                if (field.cols === 1)                     colSpanClass = 'md:col-span-1 lg:col-span-1';
-                else if (field.cols === 2)                colSpanClass = 'md:col-span-2 lg:col-span-2';
-                else if (field.cols === 3 || field.fullWidth) colSpanClass = 'md:col-span-2 lg:col-span-3';
-                else if (field.cols === 12)               colSpanClass = 'md:col-span-2 lg:col-span-3';
+                if (field.cols === 1)                           colSpanClass = 'md:col-span-1';
+                else if (field.cols === 2)                      colSpanClass = 'md:col-span-2';
+                else if (field.cols === 3 || field.fullWidth)   colSpanClass = `md:col-span-2${columns >= 3 ? ' lg:col-span-3' : ''}`;
+                else if (field.cols === 12)                     colSpanClass = `md:col-span-2${columns >= 3 ? ' lg:col-span-3' : ''}`;
 
                 return (
                   <div key={field.name} className={colSpanClass}>
@@ -1084,37 +1135,38 @@ export default function FormModal({
               })}
             </div>
 
-            {/* ── Pie del formulario: botones de acción ── */}
-            <div className="flex gap-3 sm:gap-2 pt-6 sm:pt-4 border-t-2 sm:border-t border-gray-100">
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={isSubmitting}
-                className="flex-1 px-6 sm:px-4 py-4 sm:py-2 text-base sm:text-sm font-bold text-gray-800 sm:text-gray-700 rounded-lg sm:rounded hover:bg-gray-100 sm:hover:bg-gray-50 active:bg-gray-200 sm:active:bg-gray-100 transition-all duration-200 disabled:opacity-50"
-              >
-                ✕ Cancelar
-              </button>
-
-              <button
-                type="submit"
-                disabled={isSubmitting || submitDisabled}
-                className="flex-1 px-6 sm:px-4 py-4 sm:py-2 text-base sm:text-sm bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold rounded-lg sm:rounded hover:shadow-xl sm:hover:shadow-md hover:from-blue-700 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-3 sm:gap-2 group active-scale-95 sm:active:scale-100"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader size={22} className="sm:w-5 sm:h-5 animate-spin" />
-                    <span>Guardando</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{submitText || '✓ Guardar'}</span>
-                    <ArrowRight size={22} className="sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </button>
-            </div>
-
           </form>
+        </div>
+
+        {/* ── Pie sticky: siempre visible sin importar el scroll ── */}
+        <div className="flex gap-3 sm:gap-2 px-8 sm:px-6 py-4 sm:py-3 border-t-2 sm:border-t border-gray-100 bg-white">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            className="flex-1 px-6 sm:px-4 py-4 sm:py-2 text-base sm:text-sm font-bold text-gray-800 sm:text-gray-700 rounded-lg sm:rounded hover:bg-gray-100 sm:hover:bg-gray-50 active:bg-gray-200 sm:active:bg-gray-100 transition-all duration-200 disabled:opacity-50"
+          >
+            ✕ Cancelar
+          </button>
+
+          <button
+            type="submit"
+            form="modal-form"
+            disabled={isSubmitting || submitDisabled}
+            className="flex-1 px-6 sm:px-4 py-4 sm:py-2 text-base sm:text-sm bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold rounded-lg sm:rounded hover:shadow-xl sm:hover:shadow-md hover:from-blue-700 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-3 sm:gap-2 group active-scale-95 sm:active:scale-100"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader size={22} className="sm:w-5 sm:h-5 animate-spin" />
+                <span>Guardando</span>
+              </>
+            ) : (
+              <>
+                <span>{submitText || '✓ Guardar'}</span>
+                <ArrowRight size={22} className="sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
+          </button>
         </div>
 
       </div>

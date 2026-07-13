@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Check, Users, Search } from 'lucide-react';
 import { equipoService } from '../services/equipoService';
 import { inscripcionService } from '../services/inscripcionService';
 import { toast } from 'sonner';
+import { traducirError } from '../utils/traducirError';
 
 export default function ModalInscribirEquipos({ isOpen, onClose, categoriaInfo, onSave }) {
   const [equipos, setEquipos] = useState([]);
@@ -79,7 +80,7 @@ export default function ModalInscribirEquipos({ isOpen, onClose, categoriaInfo, 
       onSave?.();
     } catch (error) {
       console.error('Error al inscribir equipos:', error);
-      toast.error('Error al inscribir los equipos: ' + error.message);
+      toast.error('Error al inscribir los equipos: ' + traducirError(error.message));
     } finally {
       setSaving(false);
     }

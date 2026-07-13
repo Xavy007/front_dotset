@@ -6,24 +6,30 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Plus, Search, AlertCircle,
   Pencil, Trash2, CreditCard, Clock, CheckCircle, XCircle, Bell, UserPlus, Printer,
-  LayoutGrid, List
+  LayoutGrid, List, Upload
 } from 'lucide-react';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
+import CarnetPhotoCrop from '../components/CarnetPhotoCrop';
 import InscripcionParticipacionModal from '../components/InscripcionParticipacionModal';
+import ImportarJugadoresModal from '../components/ImportarJugadoresModal';
 import PageHeader from '../components/PageHeader';
 import StatCard, { StatsRow } from '../components/StatCard';
 import { toast } from 'sonner';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { API_BASE, SERVER_URL } from '../services/api.config.js';
 import { useAsociacion } from '../hooks/useAsociacion.js';
 import { tienePermiso } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 export function JugadoresPage() {
   const [jugadores, setJugadores] = useState([]);
+  const [createModalKey, setCreateModalKey] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingJugador, setEditingJugador] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('jugadores:search', '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,6 +47,9 @@ export function JugadoresPage() {
   const [carnetsPendientes, setCarnetsPendientes] = useState([]);
   const [isCarnetModalOpen, setIsCarnetModalOpen] = useState(false);
   const [selectedCarnet, setSelectedCarnet] = useState(null);
+  const [isRechazarModalOpen, setIsRechazarModalOpen] = useState(false);
+  const [motivoRechazo, setMotivoRechazo] = useState('');
+  const [carnetARechazar, setCarnetARechazar] = useState(null);
 
   // ✅ NUEVOS ESTADOS PARA MODAL DE GESTIÓN
   const [isGestionModalOpen, setIsGestionModalOpen] = useState(false);
@@ -59,9 +68,9 @@ export function JugadoresPage() {
   const { asociacion, logoUrl: logoAsociacion } = useAsociacion();
 
   // Vista y filtros
-  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
-  const [filterClub, setFilterClub] = useState('');
-  const [filterCarnet, setFilterCarnet] = useState('');
+  const [viewMode, setViewMode] = usePersistedState('jugadores:viewMode', 'cards');
+  const [filterClub, setFilterClub] = usePersistedState('jugadores:filterClub', '');
+  const [filterCarnet, setFilterCarnet] = usePersistedState('jugadores:filterCarnet', '');
 
   const getUsuarioLogueado = () => {
     try {
@@ -131,7 +140,8 @@ const fetchCategorias = async () => {
       value: String(c.id_categoria ?? c.id),
       edad_inicio: c.edad_inicio,
       edad_limite: c.edad_limite,
-      color: c.color || '#3B82F6', // Color HEX de la categoría (default azul)
+      color: c.color || '#3B82F6',
+      genero: c.genero ?? null, // 'masculino' | 'femenino' | 'mixto' — valor real de la BD
     }));
     setCategorias(opts);
   } catch (e) {
@@ -159,19 +169,27 @@ const fetchCategorias = async () => {
     return edad;
   };
 
-  // ✅ Función para obtener categorías elegibles según edad del jugador
+  // ✅ Función para obtener categorías elegibles según edad Y género del jugador
   const obtenerCategoriasElegibles = (jugador) => {
     const edad = calcularEdad(jugador.fnac || jugador.persona?.fnac);
+    const generoJugador = jugador.genero; // 'masculino' | 'femenino' | 'otro' | null
 
     if (edad === null || categorias.length === 0) {
       console.warn('⚠️ No se pudo calcular edad o no hay categorías disponibles');
-      return categorias; // Devolver todas si no se puede calcular
+      return categorias;
     }
 
-    console.log(`📅 Edad del jugador: ${edad} años`);
+    console.log(`📅 Edad: ${edad} años | Género: ${generoJugador || 'desconocido'}`);
 
-    // Ordenar categorías por edad_inicio ascendente
-    const categoriasOrdenadas = [...categorias].sort((a, b) =>
+    // Filtrar por género: solo se compara el género real de la categoría con el del jugador.
+    // 'mixto' solo aplica si la categoría está explícitamente marcada como tal en la BD.
+    const categoriasPorGenero = categorias.filter(cat => {
+      if (!generoJugador || generoJugador === 'otro') return true; // jugador sin género → sin restricción
+      return cat.genero === generoJugador || cat.genero === 'mixto';
+    });
+
+    // Ordenar por edad_inicio ascendente
+    const categoriasOrdenadas = [...categoriasPorGenero].sort((a, b) =>
       (a.edad_inicio || 0) - (b.edad_inicio || 0)
     );
 
@@ -184,20 +202,20 @@ const fetchCategorias = async () => {
 
     if (indiceCategoriaBase === -1) {
       console.warn('⚠️ No se encontró categoría base para edad', edad);
-      return categorias; // Devolver todas si no hay categoría base
+      return categoriasPorGenero; // Devolver las filtradas por género aunque no haya base por edad
     }
 
     const categoriaBase = categoriasOrdenadas[indiceCategoriaBase];
-    console.log(`✅ Categoría base: ${categoriaBase.label} (${categoriaBase.edad_inicio}-${categoriaBase.edad_limite} años)`);
+    console.log(`✅ Categoría base: ${categoriaBase.label} (${categoriaBase.edad_inicio}-${categoriaBase.edad_limite} | ${categoriaBase.genero})`);
 
     // Incluir categoría base + hasta 3 categorías superiores
     const categoriasElegibles = categoriasOrdenadas.slice(
       indiceCategoriaBase,
-      indiceCategoriaBase + 4 // Base + 3 superiores = 4 categorías
+      indiceCategoriaBase + 4
     );
 
     console.log(`📋 Categorías elegibles (${categoriasElegibles.length}):`,
-      categoriasElegibles.map(c => c.label).join(', ')
+      categoriasElegibles.map(c => `${c.label} (${c.genero})`).join(', ')
     );
 
     return categoriasElegibles;
@@ -482,6 +500,7 @@ const fetchCategorias = async () => {
   };
 
   const openCreateModal = () => {
+    setCreateModalKey(k => k + 1);
     setIsCreateModalOpen(true);
   };
 
@@ -549,6 +568,9 @@ const fetchCategorias = async () => {
       if (formData.foto_carnet) {
         console.log('📷 Agregando foto:', formData.foto_carnet.name);
         body.append('foto', formData.foto_carnet);
+        if (formData.foto_procesada === 'true') {
+          body.append('foto_procesada', 'true');
+        }
       } else {
         console.log('⚠️ No hay foto en formData');
       }
@@ -781,27 +803,32 @@ const fetchCategorias = async () => {
     }
   };
 
-  const rechazarCarnet = async (carnet) => {
-    const motivo = window.prompt('Ingrese el motivo del rechazo:');
-    if (!motivo) return;
+  const rechazarCarnet = (carnet) => {
+    setCarnetARechazar(carnet);
+    setMotivoRechazo('');
+    setIsRechazarModalOpen(true);
+  };
 
+  const confirmarRechazo = async () => {
+    if (!motivoRechazo.trim()) return;
+    const carnet = carnetARechazar;
     try {
       const idCarnet = carnet.id_carnet || carnet.id;
-      
       const res = await fetch(`${API_URL_CARNET}/${idCarnet}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           estado_carnet: 'cancelado',
-          observaciones: `Rechazado: ${motivo}`
+          observaciones: `Rechazado: ${motivoRechazo.trim()}`
         })
       });
-
       if (!res.ok) throw new Error('Error al rechazar carnet');
-
       toast.success('Carnet rechazado');
       await fetchCarnetsPendientes();
       await fetchJugadores();
+      setIsRechazarModalOpen(false);
+      setCarnetARechazar(null);
+      setMotivoRechazo('');
       setIsCarnetModalOpen(false);
       setSelectedCarnet(null);
     } catch (err) {
@@ -1051,106 +1078,80 @@ const fetchCategorias = async () => {
 
   const getJugadorFields = (isEditMode = false) => {
     const campos = [
-      { name: 'ci', label: 'CI', type: 'text', placeholder: 'Ej: 12345678', required: true, cols: 3 },
-      { name: 'nombre', label: 'Nombre', type: 'text', placeholder: 'Ej: Juan', required: true, cols: 3 },
-      { name: 'ap', label: 'Apellido Paterno', type: 'text', placeholder: 'Ej: Pérez', required: true, cols: 3 },
-      { name: 'am', label: 'Apellido Materno', type: 'text', placeholder: 'Opcional', required: false, cols: 3 },
-      { name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false, cols: 2 },
+      // ── Datos personales ──────────────────────────────
+      { type: 'section', name: 'sec_persona', label: 'Datos Personales', cols: 12 },
+      { name: 'ci',     label: 'CI',               type: 'text', placeholder: 'Ej: 12345678', required: true,  cols: 1 },
+      { name: 'nombre', label: 'Nombre',            type: 'text', placeholder: 'Ej: Juan',     required: true,  cols: 1 },
+      { name: 'ap',     label: 'Apellido Paterno',  type: 'text', placeholder: 'Ej: Pérez',    required: true,  cols: 1 },
+      { name: 'am',     label: 'Apellido Materno',  type: 'text', placeholder: 'Opcional',     required: false, cols: 1 },
       {
-        name: 'genero',
-        label: 'Género',
-        type: 'select',
-        required: false,
-        placeholder: 'Seleccione un género',
-        cols: 2,
-        options: [
-          { label: 'Masculino', value: 'masculino' },
-          { label: 'Femenino', value: 'femenino' },
-          { label: 'Otro', value: 'otro' },
-        ],
+        name: 'fnac', label: 'Fecha de Nacimiento', type: 'date', required: false, cols: 1,
+        minDate: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 70); return d.toISOString().split('T')[0]; })(),
+        maxDate: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 3);  return d.toISOString().split('T')[0]; })(),
       },
       {
-        name: 'id_nacionalidad',
-        label: 'Nacionalidad',
-        type: 'select',
-        required: false,
-        placeholder: 'Seleccione una nacionalidad',
+        name: 'genero', label: 'Género', type: 'select', required: false,
+        placeholder: 'Seleccione un género', cols: 1,
+        options: [
+          { label: 'Masculino', value: 'masculino' },
+          { label: 'Femenino',  value: 'femenino'  },
+          { label: 'Otro',      value: 'otro'       },
+        ],
+      },
+      // ── Origen ───────────────────────────────────────
+      { type: 'section', name: 'sec_origen', label: 'Origen', cols: 12 },
+      {
+        name: 'id_nacionalidad', label: 'Nacionalidad', type: 'select', required: false,
+        placeholder: 'Seleccione una nacionalidad', cols: 1,
         resetChildren: ['id_departamento', 'id_provincia_origen'],
-        cols: 2,
         options: nacionalidades,
       },
       {
-        name: 'id_departamento',
-        label: 'Departamento',
-        type: 'select',
-        placeholder: 'Seleccione un departamento',
+        name: 'id_departamento', label: 'Departamento', type: 'select',
+        placeholder: 'Seleccione un departamento', cols: 1,
         resetChildren: ['id_provincia_origen'],
-        cols: 2,
         getDynamicOptions: (formData) => {
-          const nacionalidadId = formData.id_nacionalidad;
-          if (!nacionalidadId) return departamentos;
-          return departamentos.filter(
-            d => String(d.id_nacionalidad) === String(nacionalidadId)
-          );
+          const id = formData.id_nacionalidad;
+          if (!id) return departamentos;
+          return departamentos.filter(d => String(d.id_nacionalidad) === String(id));
         },
         options: departamentos,
       },
       {
-        name: 'id_provincia_origen',
-        label: 'Provincia',
-        type: 'select',
-        placeholder: 'Seleccione una provincia',
-        cols: 2,
+        name: 'id_provincia_origen', label: 'Provincia', type: 'select',
+        placeholder: 'Seleccione una provincia', cols: 1,
         getDynamicOptions: (formData) => {
-          const departamentoId = formData.id_departamento;
-          if (!departamentoId) return provincias;
-          return provincias.filter(
-            p => String(p.id_departamento) === String(departamentoId)
-          );
+          const id = formData.id_departamento;
+          if (!id) return provincias;
+          return provincias.filter(p => String(p.id_departamento) === String(id));
         },
         options: provincias,
       },
+      // ── Datos del jugador ─────────────────────────────
+      { type: 'section', name: 'sec_jugador', label: 'Datos del Jugador', cols: 12 },
       {
-        name: 'id_club',
-        label: 'Club',
-        type: 'select',
-        required: true,
-        placeholder: 'Seleccione un club',
-        cols: 2,
-        options: clubs,
+        name: 'id_club', label: 'Club', type: 'select', required: true,
+        placeholder: 'Seleccione un club', cols: 1, options: clubs,
       },
       {
-        name: 'estatura',
-        label: 'Estatura (cm)',
-        type: 'number',
-        placeholder: 'Ej: 175',
-        required: false,
-        min: 100,
-        max: 250,
-        cols: 2,
-      },
-      {
-        name: 'foto',
-        label: 'Foto del Jugador',
-        type: 'file',
-        accept: 'image/*',
-        required: false,
-        cols: 2,
-        helperText: 'Formatos: JPG, PNG, GIF o WEBP (máx. 5MB)',
+        name: 'estatura', label: 'Estatura (cm)', type: 'number',
+        placeholder: 'Ej: 175', required: false, min: 100, max: 250, cols: 1,
       },
     ];
 
     if (!isEditMode && gestiones.length > 0) {
       campos.push({
-        name: 'id_gestion',
-        label: 'Gestión/Temporada (para carnet)',
-        type: 'select',
-        required: esClubRepresentante,
-        placeholder: 'Seleccione gestión',
-        cols: 2,
-        options: gestiones,
+        name: 'id_gestion', label: 'Gestión/Temporada (para carnet)',
+        type: 'select', required: esClubRepresentante,
+        placeholder: 'Seleccione gestión', cols: 1, options: gestiones,
       });
     }
+
+    campos.push({
+      name: 'foto', label: 'Foto del Jugador', type: 'file',
+      accept: 'image/*', required: false, cols: 12,
+      helperText: 'Formatos: JPG, PNG, GIF o WEBP (máx. 5MB)',
+    });
 
     return campos;
   };
@@ -1220,12 +1221,20 @@ const fetchCategorias = async () => {
       },
       {
         name: 'foto_carnet',
-        label: 'Foto del Carnet (opcional)',
-        type: 'file',
-        accept: 'image/*',
-        required: false,
+        type: 'custom',
         cols: 12,
-        helperText: 'Suba una foto tipo carnet del jugador (fondo blanco recomendado, máx. 5MB)',
+        renderCustom: (formData, handleFieldChange) => (
+          <CarnetPhotoCrop
+            jugadorId={jugadorParaCarnet?.id_jugador || jugadorParaCarnet?.id}
+            token={sessionStorage.getItem('token')}
+            apiBase={API_BASE}
+            serverUrl={SERVER_URL}
+            onCropComplete={(file) => {
+              handleFieldChange('foto_carnet', file);
+              handleFieldChange('foto_procesada', file ? 'true' : '');
+            }}
+          />
+        ),
       },
       {
         name: 'observaciones',
@@ -1264,6 +1273,16 @@ const fetchCategorias = async () => {
         subtitle="Gestiona los jugadores del sistema."
         action={puedeCrearJugador ? { label: 'Nuevo Jugador', icon: Plus, onClick: openCreateModal } : null}
       />
+      {puedeCrearJugador && (
+        <div className="flex justify-end mb-2 -mt-4">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+          >
+            <Upload size={13} /> Importar Excel
+          </button>
+        </div>
+      )}
 
       {esAdminOSecretario && carnetsPendientes.length > 0 && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -1324,15 +1343,8 @@ const fetchCategorias = async () => {
         </div>
       )}
 
-      <StatsRow cols={4}>
-        <StatCard title="Total Jugadores" value={jugadores.length}                                             icon={Users}        color="blue"   loading={loading} />
-        <StatCard title="Carnets Activos" value={jugadores.filter(j => j.estadoCarnet === 'activo').length}    icon={CheckCircle}  color="green"  loading={loading} />
-        <StatCard title="En Proceso"      value={jugadores.filter(j => j.estadoCarnet === 'pendiente').length} icon={Clock}        color="yellow" loading={loading} />
-        <StatCard title="Sin Carnet"      value={jugadores.filter(j => j.estadoCarnet === 'sin_carnet').length} icon={XCircle}     color="gray"   loading={loading} />
-      </StatsRow>
-
-      {/* ── Buscador + filtros + toggle de vista ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-5 mt-6">
+      {/* ── Buscador + stats + filtros + toggle de vista ── */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
@@ -1343,6 +1355,11 @@ const fetchCategorias = async () => {
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
+
+        <StatCard compact title="Total" value={jugadores.length} icon={Users} color="blue" loading={loading} />
+        <StatCard compact title="Activos" value={jugadores.filter(j => j.estadoCarnet === 'activo').length} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard compact title="En Proceso" value={jugadores.filter(j => j.estadoCarnet === 'pendiente').length} icon={Clock} color="yellow" loading={loading} />
+        <StatCard compact title="Sin Carnet" value={jugadores.filter(j => j.estadoCarnet === 'sin_carnet').length} icon={XCircle} color="gray" loading={loading} />
 
         <select
           value={filterClub}
@@ -1525,11 +1542,13 @@ const fetchCategorias = async () => {
 
       {/* Modal de creación */}
       <FormModal
+        key={`create-jugador-${createModalKey}`}
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateJugador}
         title="Crear Nuevo Jugador"
         size="5xl"
+        columns={3}
         fields={getJugadorFields(false)}
         initialData={{
           ci: '',
@@ -1560,6 +1579,7 @@ const fetchCategorias = async () => {
           onSubmit={handleEditJugador}
           title="Editar Jugador"
           size="5xl"
+          columns={3}
           fields={getJugadorFields(true)}
           initialData={{
             ci: editingJugador.ci || '',
@@ -1712,14 +1732,18 @@ const fetchCategorias = async () => {
                 </div>
 
                 {/* Vista previa del carnet en el modal */}
-                <div className="flex justify-center p-6 bg-gray-100">
+                <div className="flex justify-center p-4 bg-gray-100 overflow-x-auto">
                   <div
                     className="relative overflow-hidden shadow-2xl"
                     style={{
                       width: '700px',
                       height: '441px',
                       background: '#FFFFFF',
-                      border: `6px solid ${colorBase}`
+                      border: `6px solid ${colorBase}`,
+                      transform: 'scale(0.82)',
+                      transformOrigin: 'top center',
+                      marginBottom: '-79px',
+                      flexShrink: 0
                     }}
                   >
                     {/* Barra lateral izquierda con texto VOLEIBOL vertical */}
@@ -2113,6 +2137,53 @@ const fetchCategorias = async () => {
       })()}
 
 
+      {/* ── MODAL DE RECHAZO DE CARNET ── */}
+      {isRechazarModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Rechazar carnet</h3>
+              <button
+                onClick={() => { setIsRechazarModalOpen(false); setCarnetARechazar(null); setMotivoRechazo(''); }}
+                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-600 mb-4">Ingresa el motivo del rechazo para que quede registrado en el carnet.</p>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Motivo <span className="text-red-500">*</span></label>
+              <textarea
+                value={motivoRechazo}
+                onChange={e => setMotivoRechazo(e.target.value)}
+                rows={3}
+                placeholder="Ej: La foto no cumple los requisitos mínimos de calidad..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+                autoFocus
+              />
+              {motivoRechazo.trim().length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">El motivo es obligatorio</p>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => { setIsRechazarModalOpen(false); setCarnetARechazar(null); setMotivoRechazo(''); }}
+                className="flex-1 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarRechazo}
+                disabled={!motivoRechazo.trim()}
+                className="flex-1 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Confirmar rechazo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ✅ MODAL DE INSCRIPCIÓN EN EQUIPOS */}
       {jugadorParaInscripcion && (
         <InscripcionParticipacionModal
@@ -2133,6 +2204,14 @@ const fetchCategorias = async () => {
           onSuccess={handleInscripcionSuccess}
         />
       )}
+      <ImportarJugadoresModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportado={() => {
+          fetchJugadores();
+          setIsImportModalOpen(false);
+        }}
+      />
     </div>
   );
 }

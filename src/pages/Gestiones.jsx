@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   FileText, Plus, Search, AlertCircle,
-  Pencil, Power, Trash2
+  Pencil, Power, Trash2, CheckCircle, XCircle
 } from 'lucide-react';
+import StatCard from '../components/StatCard';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 import { API_BASE } from '../services/api.config.js';
 import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 export function GestionesPage() {
   const [gestiones, setGestiones] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGestion, setEditingGestion] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('gestiones:search', '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -77,14 +80,14 @@ export function GestionesPage() {
         nombre: formData.nombre.trim(),
         gestion: anio,
         descripcion: formData.descripcion || null,
-        estado: formData.estado === 'true' || formData.estado === true,
+        estado: editingGestion ? (formData.estado === 'true' || formData.estado === true) : true,
       };
       const method = editingGestion ? 'PUT' : 'POST';
       const url = editingGestion ? `${API_URL}/${editingGestion.id_gestion}` : API_URL;
       const res = await fetch(url, {
         method, headers: getAuthHeaders(), body: JSON.stringify(body)
       });
-      if (!res.ok) throw new Error(await res.text() || 'Error al guardar la gestión');
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || 'Error al guardar la gestión'); }
       await fetchGestiones();
       setIsModalOpen(false);
       setEditingGestion(null);
@@ -209,17 +212,7 @@ export function GestionesPage() {
   const formFields = [
     { name: 'nombre', label: 'Nombre de la gestión', type: 'text', required: true },
     { name: 'gestion', label: 'Año de gestión', type: 'number', required: true, min: minYear, max: maxYear },
-    { name: 'descripcion', label: 'Descripción', type: 'textarea', required: false },
-    {
-      name: 'estado',
-      label: 'Estado',
-      type: 'select',
-      required: true,
-      options: [
-        { label: 'Activo', value: true },
-        { label: 'Inactivo', value: false },
-      ]
-    },
+    { name: 'descripcion', label: 'Descripción', type: 'textarea', required: false, cols: 12, rows: 3 },
   ];
 
   const totalActivas = gestiones.filter(g => g.estadoBooleano).length;
@@ -237,39 +230,30 @@ export function GestionesPage() {
           <span className="text-red-700">{error}</span>
         </div>
       )}
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Buscar gestión (nombre, año o descripción)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
+
+        <StatCard compact title="Total" value={gestiones.length} icon={FileText} color="blue" loading={loading} />
+        <StatCard compact title="Activas" value={totalActivas} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard compact title="Inactivas" value={totalInactivas} icon={XCircle} color="red" loading={loading} />
+
         {puedeCrearGestion && (
           <button
             onClick={() => { setEditingGestion(null); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
           >
-            <Plus size={20} /> Nueva Gestión
+            <Plus size={16} /> Nueva Gestión
           </button>
         )}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm">Total Gestiones</p>
-          <p className="text-2xl font-bold text-gray-900">{gestiones.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm">Activas</p>
-          <p className="text-2xl font-bold text-green-600">{totalActivas}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-red-500">
-          <p className="text-gray-600 text-sm">Inactivas</p>
-          <p className="text-2xl font-bold text-red-600">{totalInactivas}</p>
-        </div>
       </div>
       <DataTable data={filteredGestiones} columns={columns} itemsPerPage={5} loading={loading} />
       <FormModal
@@ -279,6 +263,7 @@ export function GestionesPage() {
         title={editingGestion ? 'Editar Gestión' : 'Registrar Nueva Gestión'}
         fields={formFields}
         initialData={editingGestion || {}}
+        size="lg"
       />
     </div>
   );

@@ -4,13 +4,16 @@
 // ===============================================
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, AlertCircle } from 'lucide-react';
+import { usePersistedState } from '../hooks/usePersistedState';
+import { Users, Plus, Search, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
+import StatCard from '../components/StatCard';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
 import { toast } from 'sonner';
 
 import { API_BASE } from '../services/api.config.js';
 import { tienePermiso, getUsuarioActual } from '../utils/permissions.js';
+import { traducirError } from '../utils/traducirError';
 
 // AJUSTADAS AL NUEVO BACKEND
 const API_URL_EQTECNICO = `${API_BASE}/eqtecnico`;
@@ -171,7 +174,7 @@ export function EqTecnicoPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTecnico, setEditingTecnico] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('eqtecnico:search', '');
 
   // ====== NUEVO: Estados para autocompletar CI ======
   const [ciMessage, setCiMessage] = useState('');
@@ -670,15 +673,17 @@ const handleEditTecnico = async (formData) => {
   const getTecnicoFields = (isEditMode = false, updateFormData = null) => {
     
     const baseFields = [
+      // ── Datos personales ──────────────────────────────
+      { type: 'section', name: 'sec_personal', label: 'Datos Personales', cols: 12 },
       {
-          name: 'ci',
-          label: 'CI',
-          ype: 'text',
-          placeholder: 'Ej: 12345678',
-          required: !isEditMode,
-          cols: 3,
-          disabled: isEditMode, // ← Deshabilitar en modo edición
-          helpText: isEditMode ? 'El CI no se puede modificar' : undefined,
+        name: 'ci',
+        label: 'CI',
+        type: 'text',
+        placeholder: 'Ej: 12345678',
+        required: !isEditMode,
+        cols: 1,
+        disabled: isEditMode,
+        helpText: isEditMode ? 'El CI no se puede modificar' : undefined,
       },
       {
         name: 'nombre',
@@ -686,7 +691,7 @@ const handleEditTecnico = async (formData) => {
         type: 'text',
         placeholder: 'Ej: Juan',
         required: true,
-        cols: 3,
+        cols: 1,
       },
       {
         name: 'ap',
@@ -694,7 +699,7 @@ const handleEditTecnico = async (formData) => {
         type: 'text',
         placeholder: 'Ej: Pérez',
         required: true,
-        cols: 3,
+        cols: 1,
       },
       {
         name: 'am',
@@ -702,14 +707,14 @@ const handleEditTecnico = async (formData) => {
         type: 'text',
         placeholder: 'Opcional',
         required: false,
-        cols: 3,
+        cols: 1,
       },
       {
         name: 'fnac',
         label: 'Fecha de Nacimiento',
         type: 'date',
         required: false,
-        cols: 3,
+        cols: 1,
       },
       {
         name: 'genero',
@@ -717,7 +722,7 @@ const handleEditTecnico = async (formData) => {
         type: 'select',
         required: false,
         placeholder: 'Seleccione un género',
-        cols: 3,
+        cols: 1,
         options: [
           { label: 'Masculino', value: 'masculino' },
           { label: 'Femenino', value: 'femenino' },
@@ -730,7 +735,7 @@ const handleEditTecnico = async (formData) => {
         type: 'select',
         required: false,
         placeholder: 'Seleccione una nacionalidad',
-        cols: 3,
+        cols: 1,
         options: nacionalidades,
         resetChildren: ['id_departamento', 'id_provincia_origen'],
       },
@@ -739,7 +744,7 @@ const handleEditTecnico = async (formData) => {
         label: 'Departamento',
         type: 'select',
         placeholder: 'Seleccione un departamento',
-        cols: 3,
+        cols: 1,
         getDynamicOptions: (formData) => {
           const nacionalidadId = formData.id_nacionalidad;
           if (!nacionalidadId) return departamentos;
@@ -755,7 +760,7 @@ const handleEditTecnico = async (formData) => {
         label: 'Provincia',
         type: 'select',
         placeholder: 'Seleccione una provincia',
-        cols: 3,
+        cols: 1,
         getDynamicOptions: (formData) => {
           const departamentoId = formData.id_departamento;
           if (!departamentoId) return provincias;
@@ -765,13 +770,15 @@ const handleEditTecnico = async (formData) => {
         },
         options: provincias,
       },
+      // ── Datos del técnico ─────────────────────────────
+      { type: 'section', name: 'sec_tecnico', label: 'Datos del Técnico', cols: 12 },
       {
         name: 'id_club',
         label: 'Club',
         type: 'select',
         required: true,
         placeholder: 'Seleccione un club',
-        cols: 3,
+        cols: 1,
         options: clubs,
       },
       {
@@ -779,7 +786,7 @@ const handleEditTecnico = async (formData) => {
         label: 'Rol',
         type: 'select',
         required: true,
-        cols: 3,
+        cols: 1,
         options: [
           { label: 'Director Técnico', value: 'DT' },
           { label: 'Entrenador Asistente', value: 'EA' },
@@ -793,21 +800,23 @@ const handleEditTecnico = async (formData) => {
         label: 'Fecha inicio',
         type: 'date',
         required: false,
-        cols: 3,
+        cols: 1,
       },
       {
         name: 'fecha_fin',
         label: 'Fecha fin (si aplica)',
         type: 'date',
         required: false,
-        cols: 3,
+        cols: 1,
       },
+      // ── Observaciones ─────────────────────────────────
+      { type: 'section', name: 'sec_notas', label: 'Notas', cols: 12 },
       {
         name: 'observaciones',
         label: 'Observaciones',
         type: 'textarea',
         required: false,
-        placeholder: 'Notas, sanciones, etc.',
+        placeholder: 'Notas adicionales, etc.',
         rows: 3,
         cols: 12,
       },
@@ -872,56 +881,31 @@ const handleEditTecnico = async (formData) => {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, CI, rol o club..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, CI, rol o club..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
         </div>
+
+        <StatCard compact title="Total CT" value={tecnicos.length} icon={Users} color="blue" loading={loading} />
+        <StatCard compact title="Activos" value={tecnicos.filter(t => t.estado_eq === 'activo').length} icon={CheckCircle} color="green" loading={loading} />
+        <StatCard compact title="Clubs" value={new Set(tecnicos.map(t => t.nombreClub).filter(Boolean)).size} icon={Building2} color="purple" loading={loading} />
 
         {puedeCrearTecnico && (
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
-            <Plus size={20} />
+            <Plus size={16} />
             Nuevo integrante
           </button>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Total Cuerpo Técnico</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : tecnicos.length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Activos</p>
-          <p className="text-2xl font-bold text-green-600">
-            {loading
-              ? '...'
-              : tecnicos.filter((t) => t.estado_eq === 'activo').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <p className="text-gray-600 text-sm">Clubs con técnicos</p>
-          <p className="text-2xl font-bold text-indigo-600">
-            {loading
-              ? '...'
-              : new Set(
-                  tecnicos.map((t) => t.nombreClub).filter(Boolean)
-                ).size}
-          </p>
-        </div>
       </div>
 
       <DataTable
@@ -943,6 +927,7 @@ const handleEditTecnico = async (formData) => {
         onSubmit={handleCreateTecnico}
         title="Agregar integrante del cuerpo técnico"
         size="5xl"
+        columns={3}
         fields={(updateFormData) => getTecnicoFields(false, updateFormData)}
         initialData={{
           ci: '',
@@ -973,6 +958,7 @@ const handleEditTecnico = async (formData) => {
           onSubmit={handleEditTecnico}
           title="Editar integrante del cuerpo técnico"
           size="5xl"
+          columns={3}
           fields={getTecnicoFields(true)}
           initialData={{
             ci: editingTecnico.ci,
