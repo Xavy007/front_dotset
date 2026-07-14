@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Eye, EyeOff } from 'lucide-react';
 
 export default function JugadorForm({
   onClose,
@@ -165,7 +165,7 @@ export default function JugadorForm({
               onClick={() => togglePasswordVisibility(field.name)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              {isVisible ? '👁️‍🗨️' : '👁️'}
+              {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
         );

@@ -25,7 +25,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, Plus, Search, Edit2, Trash2, X, Shuffle, CheckCircle, Tag, LayoutList } from 'lucide-react';
+import { Trophy, Plus, Search, Edit2, Trash2, X, Shuffle, CheckCircle, Tag, LayoutList, Settings, RefreshCw, BarChart3 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import StatCard from '../components/StatCard';
 import DataTable from '../components/Datatable';
 import FormModal from '../components/FormModal';
@@ -856,7 +857,7 @@ export function CampeonatosPage() {
             className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
             title="Configurar categorías"
           >
-            🏷️ Categorías
+            <Tag size={14} /> Categorías
           </button>
           {/*<button
             onClick={() => handleVerTablaPosiciones(campeonato)}
@@ -870,7 +871,7 @@ export function CampeonatosPage() {
             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
             title="Configurar formato y equipos"
           >
-            ⚙️ Configurar
+            <Settings size={14} /> Configurar
           </button>
           <button
             onClick={() => handleEdit(campeonato)}
@@ -935,11 +936,11 @@ export function CampeonatosPage() {
       required: true,
       cols: 1,
       options: [
-        { value: 'programado', label: '📅 Programado' },
-        { value: 'en_curso', label: '▶️ En Curso' },
-        { value: 'finalizado', label: '✅ Finalizado' },
-        { value: 'suspendido', label: '⏸️ Suspendido' },
-        { value: 'cancelado', label: '❌ Cancelado' }
+        { value: 'programado', label: 'Programado' },
+        { value: 'en_curso', label: 'En Curso' },
+        { value: 'finalizado', label: 'Finalizado' },
+        { value: 'suspendido', label: 'Suspendido' },
+        { value: 'cancelado', label: 'Cancelado' }
       ]
     },
     {
@@ -1006,11 +1007,7 @@ export function CampeonatosPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">🏆 Campeonatos</h1>
-        <p className="text-gray-600 mt-2">Gestiona todos los campeonatos y torneos disponibles.</p>
-      </div>
+      <PageHeader icon={Trophy} title="Campeonatos" subtitle="Gestiona todos los campeonatos y torneos disponibles." />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -1065,7 +1062,7 @@ export function CampeonatosPage() {
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-blue-50 sticky top-0">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900">⚙️ Configurar Formato por Categoría</h2>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Settings size={18} /> Configurar Formato por Categoría</h2>
                 <button
                   onClick={() => setShowFormatModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -1116,9 +1113,9 @@ export function CampeonatosPage() {
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Formato</label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                       {[
-                        { value: 'todos-contra-todos', label: '🔄 Todos contra Todos', desc: 'Cada equipo juega contra todos' },
-                        { value: 'series', label: '📊 Por Series', desc: 'Dividido en grupos' },
-                        { value: 'fases', label: '🏆 Por Fases', desc: 'Fase de grupos + Playoffs + Final' }
+                        { value: 'todos-contra-todos', label: 'Todos contra Todos', desc: 'Cada equipo juega contra todos' },
+                        { value: 'series', label: 'Por Series', desc: 'Dividido en grupos' },
+                        { value: 'fases', label: 'Por Fases', desc: 'Fase de grupos + Playoffs + Final' }
                       ].map(option => (
                         <button
                           key={option.value}

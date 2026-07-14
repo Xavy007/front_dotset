@@ -1,6 +1,7 @@
 // src/pages/GenerarFixture.jsx
 
 import { useState, useEffect } from 'react';
+import { Settings } from 'lucide-react';
 import { campeonatoService } from '../services/campeonatoService';
 import { categoriaService } from '../services/categoriaService';
 import { fixtureService } from '../services/fixtureService';
@@ -287,7 +288,7 @@ export default function GenerarFixture() {
               {/* Mostrar configuración cargada */}
               {categoriaSeleccionada && (
                 <div className="mt-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
-                  <h3 className="font-bold text-gray-900 mb-4">⚙️ Configuración del Fixture</h3>
+                  <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Settings size={16} /> Configuración del Fixture</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="text-gray-600">Tipo:</span>

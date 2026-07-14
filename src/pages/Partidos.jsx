@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Search, ChevronDown, ChevronUp, Trophy, Settings } from 'lucide-react';
 import { fixtureService } from '../services/fixtureService';
 import { campeonatoService } from '../services/campeonatoService';
 import ModalAsignarRecursos from '../components/ModalAsignarRecursos';
@@ -411,8 +411,8 @@ export const PartidosPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Selector de Campeonato */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🏆 Campeonato
+              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                <Trophy size={14} className="text-yellow-500" /> Campeonato
               </label>
               <select
                 value={selectedCampeonato}
@@ -706,7 +706,7 @@ export const PartidosPage = () => {
                                     : 'bg-yellow-500 hover:bg-yellow-600 text-white'
                                 }`}
                               >
-                                {tieneAsignacion ? '⚙️ Asignar' : '⚙️ Asignar'}
+                                <Settings size={14} className="inline mr-1" /> Asignar
                               </button>
                             </div>
                           </div>

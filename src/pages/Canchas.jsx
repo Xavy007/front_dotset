@@ -10,6 +10,7 @@ import {
   Pencil, Power, Trash2, Home, Users, Building2,
   CalendarDays, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import DataTable from '../components/Datatable';
 import StatCard, { StatsRow } from '../components/StatCard';
 import FormModal from '../components/FormModal';
@@ -366,8 +367,8 @@ export function CanchasPage() {
       cols: 1,
       options: [
         { label: '🏢 Coliseo', value: 'coliseo' },
-        { label: '🏖️ Abierta', value: 'abierta' },
-        { label: '📍 Otro', value: 'otro' },
+        { label: 'Abierta', value: 'abierta' },
+        { label: 'Otro', value: 'otro' },
       ]
     },
     {
@@ -419,10 +420,7 @@ export function CanchasPage() {
   // ===============================================
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">🏟️ Canchas</h1>
-        <p className="text-gray-600 mt-2">Gestiona las canchas o recintos deportivos del sistema.</p>
-      </div>
+      <PageHeader icon={MapPin} title="Canchas" subtitle="Gestiona las canchas o recintos deportivos del sistema." />
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3 items-center">

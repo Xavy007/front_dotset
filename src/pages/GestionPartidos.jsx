@@ -1,6 +1,7 @@
 // src/pages/GestionPartidos.jsx
 
 import { useState, useEffect } from 'react';
+import { Settings, MapPin, UserCheck } from 'lucide-react';
 import { campeonatoService } from '../services/campeonatoService';
 import { categoriaService } from '../services/categoriaService';
 import { fixtureService } from '../services/fixtureService';
@@ -131,8 +132,8 @@ export default function GestionPartidos() {
       <div className="w-full">
         {/* Header */}
         <div className="mb-6 px-6 pt-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            ⚙️ Gestión de Partidos
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <Settings size={32} className="text-blue-600" /> Gestión de Partidos
           </h1>
           <p className="text-gray-600">
             Asigna canchas, árbitros y horarios a los partidos
@@ -375,7 +376,7 @@ export default function GestionPartidos() {
                                   </div>
 
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-green-600">🏟️</span>
+                                    <MapPin size={14} className="text-green-600 shrink-0" />
                                     <span className="text-green-700 font-semibold truncate">
                                       {partido.cancha?.nombre || 'Sin cancha'}
                                     </span>
@@ -501,7 +502,7 @@ export default function GestionPartidos() {
                                   </div>
 
                                   <div className="flex items-center gap-2 md:col-span-2">
-                                    <span className="font-semibold text-gray-600">🏟️ Cancha:</span>
+                                    <MapPin size={14} className="text-gray-500 shrink-0" /><span className="font-semibold text-gray-600">Cancha:</span>
                                     <span className="text-orange-600 font-medium">Sin asignar</span>
                                   </div>
                                 </div>
@@ -512,7 +513,7 @@ export default function GestionPartidos() {
                                 onClick={() => handleAbrirModalAsignar(partido)}
                                 className="px-5 py-3 font-semibold rounded-xl transition-all shadow-md whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800"
                               >
-                                ⚙️ Asignar Recursos
+                                <Settings size={16} className="inline mr-1.5" /> Asignar Recursos
                               </button>
                             </div>
                           </div>
