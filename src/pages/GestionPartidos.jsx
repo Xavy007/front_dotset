@@ -22,6 +22,9 @@ export default function GestionPartidos() {
 
   const [showModalAsignar, setShowModalAsignar] = useState(false);
   const [partidoSeleccionado, setPartidoSeleccionado] = useState(null);
+  const [showModalReprogramar, setShowModalReprogramar] = useState(false);
+  const [partidoReprogramar, setPartidoReprogramar] = useState(null);
+  const [nuevaFechaHora, setNuevaFechaHora] = useState('');
 
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [jornadaActual, setJornadaActual] = useState(null);
@@ -99,6 +102,34 @@ export default function GestionPartidos() {
       setShowModalAsignar(false);
       cargarFixture();
       toast.success('Partido actualizado exitosamente');
+    }
+  };
+
+  const handleAbrirReprogramar = (partido) => {
+    const fechaLocal = partido.fecha_hora
+      ? new Date(partido.fecha_hora).toISOString().slice(0, 16)
+      : '';
+    setNuevaFechaHora(fechaLocal);
+    setPartidoReprogramar(partido);
+    setShowModalReprogramar(true);
+  };
+
+  const handleReprogramar = async () => {
+    if (!nuevaFechaHora) { toast.error('Ingresá una fecha y hora'); return; }
+    try {
+      const response = await fixtureService.actualizarPartido(partidoReprogramar.id_partido, {
+        fecha_hora: nuevaFechaHora,
+        p_estado: 'programado',
+      });
+      if (response.success) {
+        setShowModalReprogramar(false);
+        cargarFixture();
+        toast.success('Partido reprogramado correctamente');
+      } else {
+        toast.error('No se pudo reprogramar el partido');
+      }
+    } catch {
+      toast.error('Error al reprogramar el partido');
     }
   };
 
@@ -409,13 +440,24 @@ export default function GestionPartidos() {
                                 )}
                               </div>
 
-                              {/* Botón Editar */}
-                              <button
-                                onClick={() => handleAbrirModalAsignar(partido)}
-                                className="px-4 py-2 font-semibold rounded-lg transition-all shadow whitespace-nowrap bg-green-600 text-white hover:bg-green-700 text-sm"
-                              >
-                                ✏️ Editar
-                              </button>
+                              {/* Botones de acción */}
+                              <div className="flex gap-2">
+                                {partido.p_estado === 'suspendido' ? (
+                                  <button
+                                    onClick={() => handleAbrirReprogramar(partido)}
+                                    className="px-4 py-2 font-semibold rounded-lg transition-all shadow whitespace-nowrap bg-amber-500 text-white hover:bg-amber-600 text-sm"
+                                  >
+                                    📅 Reprogramar
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleAbrirModalAsignar(partido)}
+                                    className="px-4 py-2 font-semibold rounded-lg transition-all shadow whitespace-nowrap bg-green-600 text-white hover:bg-green-700 text-sm"
+                                  >
+                                    ✏️ Editar
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -534,6 +576,45 @@ export default function GestionPartidos() {
             onClose={() => setShowModalAsignar(false)}
             onGuardar={handleGuardarAsignacion}
           />
+        )}
+
+        {/* Modal Reprogramar partido suspendido */}
+        {showModalReprogramar && partidoReprogramar && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">📅 Reprogramar partido</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                {partidoReprogramar.equipoLocal?.nombre} vs {partidoReprogramar.equipoVisitante?.nombre}
+              </p>
+
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Nueva fecha y hora
+                </label>
+                <input
+                  type="datetime-local"
+                  value={nuevaFechaHora}
+                  onChange={e => setNuevaFechaHora(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowModalReprogramar(false)}
+                  className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReprogramar}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
+                >
+                  Confirmar reprogramación
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

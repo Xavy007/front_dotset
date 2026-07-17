@@ -190,10 +190,8 @@ export default function LoginFuturistic() {
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-7xl items-center justify-center px-6">
         <div className="glass neon-border w-full max-w-md rounded-2xl p-8">
           <header className="mb-8 text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-xl border border-white/20 shadow-[0_0_30px_rgba(124,58,237,0.4)] flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" className="opacity-90">
-                <path fill="currentColor" d="M6 10V8a6 6 0 1 1 12 0v2h1a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9a1 1 0 0 1 1-1zm2 0h8V8a4 4 0 1 0-8 0z"/>
-              </svg>
+            <div className="mx-auto mb-4 h-16 w-16 rounded-2xl shadow-[0_0_30px_rgba(124,58,237,0.4)] overflow-hidden">
+              <img src="/dotset-logo.png" alt="DotSet" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-2xl font-semibold tracking-wide">
               Acceso <span className="text-[--color-neon]">DOT</span>

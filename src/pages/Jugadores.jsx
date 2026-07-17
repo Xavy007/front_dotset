@@ -1,5 +1,5 @@
 // ===============================================
-// ARCHIVO: src/pages/JugadoresPage.jsx (CON FORMMODAL GESTIÓN)
+// ARCHIVO: src/pages/JugadoresPage.jsx (CON FORMMODAL GESTIÓ
 // ===============================================
 
 import React, { useState, useEffect } from 'react';

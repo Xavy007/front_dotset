@@ -92,9 +92,11 @@ export function Sidebar({ isOpen, isMobile, currentPage, onPageChange, onToggle,
         {/* Logo / Título + botón toggle */}
         <div className="h-16 flex items-center justify-between px-3 border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shrink-0">
-              <span className="text-white font-black text-sm">D</span>
-            </div>
+            <img
+              src="/dotset-logo.png"
+              alt="DotSet"
+              className="w-8 h-8 rounded-lg object-contain shrink-0"
+            />
             {isOpen && (
               <div className="leading-none">
                 <span className="text-white font-black text-xl tracking-tight">DOT</span>
